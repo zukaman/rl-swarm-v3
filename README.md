@@ -18,7 +18,7 @@ Ensure you that you are using a supported machine/device/environment:
     - RTX 4090 
     - A100
     - H100
-- >=Python3.10 (for Mac, you will likely need to upgrade)
+-  Python >=3.10 (for Mac, you will likely need to upgrade)
 
 Instructions:
 ```sh
@@ -28,6 +28,7 @@ source .venv/bin/activate
 ```
 
 If you encounter issues with the coordinator peer, try this backup peer node:
+
 ```
 DEFAULT_PEER_MULTI_ADDRS="/dns/rl-swarm.gensyn.ai/tcp/38331/p2p/QmQ2gEXoPJg6iMBSUFWGzAabS2VhnzuS782Y637hGjfsRJ" # gensyn coordinator node
 ```
