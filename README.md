@@ -23,4 +23,9 @@ Ensure you that you are using a supported machine/device:
     - A10
     - A40 
 
-Clone the repo and then `./run_hivemind.sh `
+Instructions:
+```sh
+python -m venv .venv
+source .venv/bin/activate
+./run_hivemind.sh 
+```
