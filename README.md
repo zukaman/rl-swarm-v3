@@ -1,6 +1,6 @@
-# swarm
+# RL Swarm
 
-Swarm is a fully open source framework for creating RL training swarms over the internet. Running a swarm-node allows you to launch a new swarm or connect to an existing node using its public address and join an existing swarm. 
+RL Swarm is a fully open source framework for creating RL training swarms over the internet. Running a swarm node allows you to launch a new swarm; alternatively, you can connect to an existing swarm by peering with the public address of one of its constituent nodes.
 
 Each swarm performs RL reasoning as a group, with a gossiping system (using Hivemind) for collaborative improvement between models.
 
@@ -13,7 +13,7 @@ Note that this code is experimental - particularly on arm64 architectures.
 Ensure you that you are using a supported machine/device/environment:
 
 - arm64 CPU with minimum 16gb ram
-- CUDA devices:
+- CUDA devices (officially supported):
     - RTX 3090
     - RTX 4090 
     - A100
