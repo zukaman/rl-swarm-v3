@@ -4,7 +4,7 @@ RL Swarm is a fully open source framework for creating RL training swarms over t
 
 Each swarm performs RL reasoning as a group, with a gossiping system (using [Hivemind](https://github.com/learning-at-home/hivemind)) for collaborative improvement between models.
 
-Swarm is fully open and permissionless, meaning you can run it on a basic consumer laptop at home or on a powerful GPU in the cloud.
+RL Swarm is fully open and permissionless, meaning you can run it on a basic consumer laptop at home or on a powerful GPU in the cloud.
 
 Note that this code is experimental - particularly on arm64 architectures.
 
