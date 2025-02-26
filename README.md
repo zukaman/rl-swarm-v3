@@ -10,7 +10,7 @@ Note that this code is experimental - particularly on arm64 architectures.
 
 # Run the swarm
 
-Ensure you that you are using a supported machine/device:
+Ensure you that you are using a supported machine/device/environment:
 
 - arm64 CPU with minimum 16gb ram
 - CUDA devices:
@@ -18,12 +18,18 @@ Ensure you that you are using a supported machine/device:
     - RTX 4090 
     - A100
     - H100
+- >=Python3.10 (for Mac, you will likely need to upgrade)
 
 Instructions:
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
 ./run_hivemind.sh 
+```
+
+If you encounter issues with the coordinator peer, try this backup peer node:
+```
+DEFAULT_PEER_MULTI_ADDRS="/dns/rl-swarm.gensyn.ai/tcp/38331/p2p/QmQ2gEXoPJg6iMBSUFWGzAabS2VhnzuS782Y637hGjfsRJ" # gensyn coordinator node
 ```
 
 (Experimental) fix to increase memory on macbook:
