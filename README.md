@@ -4,15 +4,15 @@ Swarm is a fully open source framework for creating RL training swarms over the 
 
 Each swarm performs RL reasoning as a group, with a gossiping system (using Hivemind) for collaborative improvement between models.
 
-Swarm is fully open and permissionless, meaning you can run it on a basic consumer laptop at home or on a powerful GPU in the cloud. And finally, it demonstrates our Reproducible Operators (RepOps) libraries.
+Swarm is fully open and permissionless, meaning you can run it on a basic consumer laptop at home or on a powerful GPU in the cloud.
 
-Note that this code is experimental - particularly on arm64 architectures or when not using CUDA.
+Note that this code is experimental - particularly on arm64 architectures.
 
 # Run the swarm
 
 Ensure you that you are using a supported machine/device:
 
-- x86 or arm64 CPU with minimum 16gb ram
+- arm64 CPU with minimum 16gb ram
 - CUDA devices:
     - RTX 3090
     - RTX 4090 
