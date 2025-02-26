@@ -12,7 +12,7 @@ export IDENTITY_PATH
 DEFAULT_PUB_MULTI_ADDRS=""
 PUB_MULTI_ADDRS=${PUB_MULTI_ADDRS:-$DEFAULT_PUB_MULTI_ADDRS}
 
-#Check if peer multi-address is given else set to default 
+#Check if peer multi-address is given else set to default
 DEFAULT_PEER_MULTI_ADDRS="/ip4/38.101.215.13/tcp/30002/p2p/QmQ2gEXoPJg6iMBSUFWGzAabS2VhnzuS782Y637hGjfsRJ" # gensyn coordinator node
 PEER_MULTI_ADDRS=${PEER_MULTI_ADDRS:-$DEFAULT_PEER_MULTI_ADDRS}
 
@@ -24,20 +24,6 @@ HOST_MULTI_ADDRS=${HOST_MULTI_ADDRS:-$DEFAULT_HOST_MULTI_ADDRS}
 # just want a random Peer ID for this run.
 DEFAULT_IDENTITY_PATH=""
 IDENTITY_PATH=${IDENTITY_PATH:-$DEFAULT_IDENTITY_PATH}
-
-
-#Cleanup repops demo
-echo "Cleaning up repops demo..."
-# clean up all the local model weight files from the onnx export
-rm model.*
-rm lm_head.weight
-
-# gensyn-onnx2torch currently requires a contraint of transformers==0.44,
-# but this interferes with the rl-swarm demo dependencies
-# After running the repop demo, we uninstall it, then install some select
-# dependencies; in particular, this removes the transformers version constraint
-yes | python -m pip uninstall gensyn-onnx2torch repop
-echo ">> Done!"
 
 #lets go!
 echo "Getting requirements..."
