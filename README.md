@@ -21,7 +21,13 @@ Ensure you that you are using a supported machine/device:
 
 Instructions:
 ```sh
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 ./run_hivemind.sh 
+```
+
+(Experimental) fix to increase memory on macbook:
+
+```
+export PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0
 ```
