@@ -2,7 +2,7 @@
 
 RL Swarm is a fully open source framework for creating RL training swarms over the internet. Running a swarm node allows you to launch a new swarm; alternatively, you can connect to an existing swarm by peering with the public address of one of its constituent nodes.
 
-Each swarm performs RL reasoning as a group, with a gossiping system (using Hivemind) for collaborative improvement between models.
+Each swarm performs RL reasoning as a group, with a gossiping system (using [Hivemind](https://github.com/learning-at-home/hivemind)) for collaborative improvement between models.
 
 Swarm is fully open and permissionless, meaning you can run it on a basic consumer laptop at home or on a powerful GPU in the cloud.
 
@@ -24,7 +24,7 @@ Instructions:
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
-./run_hivemind.sh 
+./run_rl_swarm.sh 
 ```
 
 If you encounter issues with the coordinator peer, try this backup peer node:
