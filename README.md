@@ -15,16 +15,17 @@ Ensure you that you are using a supported machine/device/environment:
 - arm64 CPU with minimum 16gb ram
 - CUDA devices (officially supported):
     - RTX 3090
-    - RTX 4090 
+    - RTX 4090
     - A100
     - H100
 -  Python >=3.10 (for Mac, you will likely need to upgrade)
 
-Instructions:
+## Instructions:
+
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
-./run_rl_swarm.sh 
+./run_rl_swarm.sh
 ```
 
 If you encounter issues with the coordinator peer, try this backup peer node:
@@ -37,4 +38,16 @@ DEFAULT_PEER_MULTI_ADDRS="/dns/rl-swarm.gensyn.ai/tcp/38331/p2p/QmQ2gEXoPJg6iMBS
 
 ```
 export PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0
+```
+
+## Alternative Instructions:
+
+If you have issues running the above on your development machine or prefer
+not to install dependencies locally, we offer a public Docker
+image that is ready to run out-of-the-box.
+Ensure your Docker engine is configured to allow
+adequate space and memory (under System-->Resources) or you might see it being `Killed`.
+
+```sh
+docker run --gpus all --pull=always -it --rm europe-docker.pkg.dev/gensyn-public-b7d9/public/rl-swarm:v0.0.1 ./run_hivemind_docker.sh
 ```
