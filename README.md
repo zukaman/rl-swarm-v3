@@ -51,3 +51,12 @@ adequate space and memory (under System-->Resources) or you might see it being `
 ```sh
 docker run --gpus all --pull=always -it --rm europe-docker.pkg.dev/gensyn-public-b7d9/public/rl-swarm:v0.0.1 ./run_hivemind_docker.sh
 ```
+
+## UI Instructions
+
+We host our own UI to monitor the state of the training loop at https://swarm.gensyn.ai. However if you'd like to host your own, we also
+publish a container for the webserver. To start it, please run:
+
+```
+docker run -it -p 8080:8000 --env INITIAL_PEERS="/ip4/38.101.215.13/tcp/30002/p2p/QmQ2gEXoPJg6iMBSUFWGzAabS2VhnzuS782Y637hGjfsRJ" europe-docker.pkg.dev/gensyn-public-b7d9/public/swamui:v0.0.1
+```
