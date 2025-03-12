@@ -49,7 +49,7 @@ Ensure your Docker engine is configured to allow
 adequate space and memory (under System-->Resources) or you might see it being `Killed`. If you don't have a GPU, remove the `--gpus all` flag.
 
 ```sh
-docker run --gpus all --pull=always -it --rm europe-docker.pkg.dev/gensyn-public-b7d9/public/rl-swarm:v0.0.1 ./run_hivemind_docker.sh
+docker run --gpus all --pull=always -it --rm europe-docker.pkg.dev/gensyn-public-b7d9/public/rl-swarm:v0.0.2 ./run_hivemind_docker.sh
 ```
 
 ## Swarm UI
