@@ -1,10 +1,10 @@
 module.exports = {
-    theme: {
-        extend: {
-            fontSize: {
-                base: '14px',
-            },
-        },
-    },
-    plugins: [],
-};
+	theme: {
+		extend: {
+			fontSize: {
+				base: '14px',
+			},
+		},
+	},
+	plugins: [],
+}

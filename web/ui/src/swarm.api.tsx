@@ -1,99 +1,108 @@
-export type LeaderboardResponse = {
-    leaders: {
-        id: string,
-        values: { x: number, y : number }[], // Not using this right now.
-        score: number,
-    }[],
-}
+import { z } from 'zod'
+
+const leaderboardResponseSchema = z.object({
+	leaders: z.array(
+		z.object({
+			id: z.string(),
+			values: z.array(z.object({ x: z.number(), y: z.number() })),
+			score: z.number(),
+		})
+	),
+})
+
+export type LeaderboardResponse = z.infer<typeof leaderboardResponseSchema>
 
 type GossipRequest = {
-    since: number,
+	since: number
 }
 
-export type GossipResponse = {
-    messages: {
-        id: string,
-        message: string,
-        node: string,
-    }[],
-    currentRound: number,
-    currentStage: number,
-}
+const gossipResponseSchema = z.object({
+	messages: z.array(
+		z.object({
+			id: z.string(),
+			message: z.string(),
+			node: z.string(),
+		})
+	),
+	currentRound: z.number(),
+	currentStage: z.number(),
+})
+export type GossipResponse = z.infer<typeof gossipResponseSchema>
 
 export async function getLeaderboard(): Promise<LeaderboardResponse> {
-    try {
-        const res = await fetch('/api/leaderboard')
-        const json = await res.json()
+	try {
+		const res = await fetch('/api/leaderboard')
+		if (!res.ok) {
+			throw new Error(`Failed to fetch leaderboard: ${res.statusText}`)
+		}
 
-        if (res.status > 499) {
-            console.error('5xx error fetching leaderboard details')
-            throw new Error('could not get leaderboard: internal server error')
-        }
+		const json = await res.json()
+		const result = leaderboardResponseSchema.parse(json)
 
-        // Clear the `values` from the api response since we aren't using it.
-        // The UI is accumulating the response scores into the values in the swarm component.
-        const lbres = json as LeaderboardResponse
+		// Truncate to 10, though this should be done server side as well.
+		result.leaders = result.leaders.slice(0, 10)
 
-        if (lbres === null || lbres === undefined) {
-            return {
-                leaders: []
-            }
-        }
+		result.leaders.forEach((leader) => {
+			leader.score = parseFloat(leader.score.toFixed(2))
+			if (leader.id.toLowerCase() === 'gensyn') {
+				leader.id = 'INITIAL PEER'
+			}
+			leader.values = []
+		})
 
-        // Truncate to 10, though this should be done server side as well.
-        lbres.leaders = lbres.leaders.slice(0, 10)
-
-        lbres.leaders?.forEach((leader) => {
-            leader.score = parseFloat(leader.score.toFixed(2))
-            if (leader.id.toLowerCase() === "gensyn") {
-                leader.id = "INITIAL PEER"
-            }
-            leader.values = []
-        })
-
-        return json
-    } catch (e) {
-        console.error('error fetching leaderboard details', e)
-        if (e instanceof Error) {
-            throw new Error(`could not get leaderboard: ${e.message}`)
-        } else {
-            throw new Error('could not get leaderboard')
-        }
-    }
+		return result
+	} catch (e) {
+		if (e instanceof z.ZodError) {
+			console.warn('zod error fetching leaderboard details. returning empty leaderboard response.', e)
+			return {
+				leaders: [],
+			}
+		} else if (e instanceof Error) {
+			console.error('error fetching leaderboard details', e)
+			throw new Error(`could not get leaderboard: ${e.message}`)
+		} else {
+			throw new Error('could not get leaderboard')
+		}
+	}
 }
 
 export async function getGossip(req: GossipRequest): Promise<GossipResponse> {
-    try {
-        const res = await fetch(`/api/gossip?since_round=${req.since}`)
-        const json = await res.json()
+	try {
+		const res = await fetch(`/api/gossip?since_round=${req.since}`)
 
-        if (res.status > 499) {
-            console.error('5xx error fetching gossip')
-            throw new Error('could not get gossip: internal server error')
-        }
+		if (!res.ok) {
+			throw new Error(`failed to fetch gossip: ${res.statusText}`)
+		}
 
-        const gres = json as GossipResponse
+		const json = await res.json()
 
-        if (gres === null || gres === undefined) {
-            return {
-                messages: [],
-                currentRound: -1,
-                currentStage: -1,
-            }
-        }
+		if (res.status > 499) {
+			console.error('5xx error fetching gossip')
+			throw new Error('could not get gossip: internal server error')
+		}
 
-        gres.messages.forEach((message) => {
-            if (message.node.toLocaleLowerCase() === "gensyn") {
-                message.node = "INITIAL PEER"
-            }
-        })
-        return json
-    } catch (e) {
-        console.error('error fetching gossip details', e)
-        if (e instanceof Error) {
-            throw new Error(`could not get gossip: ${e.message}`)
-        } else {
-            throw new Error('could not get gossip')
-        }
-    }
+		const gres = gossipResponseSchema.parse(json)
+
+		gres.messages.forEach((message) => {
+			if (message.node.toLocaleLowerCase() === 'gensyn') {
+				message.node = 'INITIAL PEER'
+			}
+		})
+
+		return gres
+	} catch (e) {
+		if (e instanceof z.ZodError) {
+			console.warn('zod error fetching gossip details. returning empty gossip response.', e)
+			return {
+				messages: [],
+				currentRound: -1,
+				currentStage: -1,
+			}
+		} else if (e instanceof Error) {
+			console.error('error fetching gossip details', e)
+			throw new Error(`could not get gossip: ${e.message}`)
+		} else {
+			throw new Error('could not get gossip')
+		}
+	}
 }
