@@ -1,12 +1,13 @@
+import gc
 import logging
 import time
 from typing import Any
 
+import torch
 from hivemind.dht import DHT
 from hivemind.utils import get_dht_time
 from trl import GRPOConfig, GRPOTrainer
 
-from hivemind_exp.utils import HivemindNode, StageData
 from hivemind_exp.dht_utils import (
     ROUND_STAGE_NUMBER_KEY,
     get_dht_value,
@@ -15,6 +16,7 @@ from hivemind_exp.dht_utils import (
     node_outputs_key,
     rewards_key,
 )
+from hivemind_exp.utils import HivemindNode, StageData
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +48,9 @@ class HivemindGRPOTrainer:
             if curr_rewards:
                 # Sorted list of (node_uuid, reward) pairs.
                 leaderboard = list(
-                    sorted(curr_rewards.items(), key=lambda t: (t[1], t[0]), reverse=True)
+                    sorted(
+                        curr_rewards.items(), key=lambda t: (t[1], t[0]), reverse=True
+                    )
                 )
                 self.dht.store(
                     key=leaderboard_key(r, s),
@@ -54,7 +58,9 @@ class HivemindGRPOTrainer:
                     expiration_time=get_dht_time() + self.node.out_expiration,
                 )
             else:
-                logger.info(f"[{self.node.uuid}] Can't retrieve round {r} stage {s - 1} rewards")
+                logger.info(
+                    f"[{self.node.uuid}] Can't retrieve round {r} stage {s - 1} rewards"
+                )
 
         def compute_loss(self, model, inputs, *args, **kwargs):
             loss = super().compute_loss(model, inputs, *args, **kwargs)
@@ -155,7 +161,25 @@ class HivemindGRPOTrainer:
                 self.node, self.dht, self.tokenizer, **kwargs
             )
             self.train_and_save(trainer, train_dataset)
-            logger.info(f"{tag} Finished training round: {round_num} stage: {stage_num}")
+            logger.info(
+                f"{tag} Finished training round: {round_num} stage: {stage_num}"
+            )
+
+        self.cleanup()
+
+    def cleanup(self):
+        # Clear various stage caches.
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+        if torch.backends.mps.is_available():  # type: ignore
+            torch.mps.empty_cache()  # type: ignore
+        try:
+            if torch.xpu.is_available():  # type: ignore
+                torch.xpu.empty_cache()  # type: ignore
+        except AttributeError:
+            pass
 
         self.node.clear_stage_cache()
 
