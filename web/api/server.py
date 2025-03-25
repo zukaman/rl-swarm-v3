@@ -96,6 +96,19 @@ async def get_health():
     }
 
 
+@app.get("/api/round_and_stage")
+def get_round_and_stage():
+    global dht_cache
+    assert dht_cache
+
+    r, s = dht_cache.get_round_and_stage()
+
+    return {
+        "round": r,
+        "stage": s,
+    }
+
+
 @app.get("/api/leaderboard")
 def get_leaderboard():
     global dht_cache
@@ -181,6 +194,7 @@ def populate_cache():
             logger.info("pulling latest dht data...")
             dht_cache.poll_dht()
             time.sleep(10)
+            logger.info("dht polled")
     except Exception as e:
         logger.error("uncaught exception while polling dht", e)
 

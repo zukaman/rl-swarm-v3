@@ -1,16 +1,16 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 @font-face {
-	font-family: 'Aux Mono';
-	src: url('/fonts/Aux Mono.woff') format('woff');
+	font-family: "Aux Mono";
+	src: url("/fonts/Aux Mono.woff") format("woff");
 	font-weight: normal;
 	font-style: normal;
 	text-rendering: optimizeLegibility;
 }
 
 @theme {
-	--font-mono: 'Aux Mono', 'monospace';
-	--font-base: '10px';
+	--font-mono: "Aux Mono", "monospace";
+	--font-base: "10px";
 	--color-gensyn-pink: #fad7d1;
 	--color-gensyn-brown: #2a0d04;
 	--color-gensyn-green: #00962f;

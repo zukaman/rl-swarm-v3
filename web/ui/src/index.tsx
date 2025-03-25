@@ -1,10 +1,10 @@
 /* @refresh reload */
-import { render } from 'solid-js/web'
-import './index.css'
-import Swarm from './Swarm.tsx'
-import { SwarmProvider } from './SwarmContext'
+import { render } from "solid-js/web"
+import "./index.css"
+import Swarm from "./Swarm.tsx"
+import { SwarmProvider } from "./SwarmContext"
 
-const root = document.getElementById('root')
+const root = document.getElementById("root")
 
 render(
 	() => (
@@ -12,5 +12,5 @@ render(
 			<Swarm />
 		</SwarmProvider>
 	),
-	root!
+	root!,
 )

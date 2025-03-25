@@ -20,6 +20,9 @@ class Cache:
 
         self.last_polled = None
 
+    def get_round_and_stage(self):
+        return self.current_round.value, self.current_stage.value
+
     def get_leaderboard(self):
         return dict(self.leaderboard)
 
@@ -59,7 +62,9 @@ class Cache:
                 key=leaderboard_key(self.current_round.value, self.current_stage.value),
                 latest=True,
             )
-            out = [
+            
+            # Create entries for all participants
+            all_entries = [
                 {
                     "id": str(t[0]),
                     "score": t[1],
@@ -69,9 +74,13 @@ class Cache:
             ]
 
             with self.lock:
-                self.leaderboard = {"leaders": out}
+                self.leaderboard = {
+                    "leaders": all_entries,
+                    "total": len(raw) if raw else 0
+                }
         except Exception as e:
             self.logger.warning("could not get leaderboard data", e)
+
 
     def _get_gossip(self):
         STAGE_GOSSIP_LIMIT = 20  # Most recent.
@@ -122,6 +131,4 @@ class Cache:
             self.gossips = {
                 "messages": [msg for _, msg in sorted(round_gossip, reverse=True)]
                 or [],
-                "currentRound": self.current_round.value,
-                "currentStage": self.current_stage.value,
             }
