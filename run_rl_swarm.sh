@@ -25,6 +25,25 @@ HOST_MULTI_ADDRS=${HOST_MULTI_ADDRS:-$DEFAULT_HOST_MULTI_ADDRS}
 DEFAULT_IDENTITY_PATH=""
 IDENTITY_PATH=${IDENTITY_PATH:-$DEFAULT_IDENTITY_PATH}
 
+# run modal_login server
+echo "Please login to create an Ethereum Server Wallet"
+cd modal-login
+yarn install
+yarn dev > /dev/null 2>&1 & # Run in background and suppress output
+#yarn dev &
+SERVER_PID=$!  # Store the process ID
+sleep 5
+open http://localhost:3000
+cd ..
+
+# Function to clean up the server process
+cleanup() {
+    echo "Shutting down server..."
+    kill $SERVER_PID
+    rm -r modal-login/temp-data/*.json
+    exit 0
+}
+
 #lets go!
 echo "Getting requirements..."
 pip install -r "$ROOT"/requirements-hivemind.txt
@@ -56,4 +75,9 @@ done
 echo ""
 echo ""
 echo "Good luck in the swarm!"
+
 python -m hivemind_exp.gsm8k.train_single_gpu --hf_token "$HUGGINGFACE_ACCESS_TOKEN" --identity_path "$IDENTITY_PATH" --public_maddr "$PUB_MULTI_ADDRS" --initial_peer "$PEER_MULTI_ADDRS" --host_maddr "$HOST_MULTI_ADDRS" --config "$CONFIG_PATH"
+
+# Set up trap to catch Ctrl+C and call cleanup
+trap cleanup INT
+wait  # Keep script running until Ctrl+C

@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
-
 def main():
     parser = TrlParser((ModelConfig, GRPOArguments, TestnetGRPOArguments, GRPOConfig)) # type: ignore
     model_args, grpo_args, testnet_args, training_args = parser.parse_args_and_config()
