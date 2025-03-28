@@ -78,6 +78,35 @@ def xmlcount_reward_func(completions, weighting=1.0, **kwargs) -> list[float]:
     contents = [completion[0]["content"] for completion in completions]
     return [count_xml(c) * weighting for c in contents]
 
+def top_k_cumulative_reward(
+    prompts,
+    completions,
+    answer,
+    logging=False,
+    **kwargs,
+) -> list[float]:
+    """
+    Dummy reward function that accumulates all rewards into one for prompt generation's top_k selector
+    """
+    correctness_reward = correctness_reward_func(
+        prompts, completions, answer, logging=logging
+    )
+    int_reward = int_reward_func(completions)
+    strict_format_reward = strict_format_reward_func(completions)
+    soft_format_reward = soft_format_reward_func(completions)
+    xmlcount_reward = xmlcount_reward_func(completions)
+    total_reward = [
+        sum(tup)
+        for tup in zip(
+            correctness_reward,
+            int_reward,
+            strict_format_reward,
+            soft_format_reward,
+            xmlcount_reward,
+        )
+    ]
+    return total_reward
+
 
 def hivemind_cumulative_reward(
     node: HivemindNode,
