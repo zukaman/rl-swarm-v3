@@ -1,19 +1,17 @@
-import torch
-
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Sequence
-import uuid
 
-COORDINATOR_KEY = "GENSYN"
+import torch
 
 
 @dataclass
 class HivemindNode:
     # Node metadata.
     model_name: str
-    node_name: str = "node"
-    uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
+    uuid: str # Usually set to node PeerID.
+
+    is_coordinator: bool = False
 
     # Q&A outputs from the last training step.
     outputs: dict[Any, Any] = field(default_factory=dict)
@@ -32,11 +30,8 @@ class HivemindNode:
     out_expiration: int = 60 * 60 * 4  # hours
 
     @staticmethod
-    def coordinator(model_name: str):
-        return HivemindNode(model_name, uuid=COORDINATOR_KEY)
-
-    def is_coordinator(self) -> bool:
-        return self.uuid == COORDINATOR_KEY
+    def coordinator(*args, **kwargs):
+        return HivemindNode(*args, **kwargs, is_coordinator=True)
 
     def get_stage_outputs(self, r, s) -> dict[str, tuple[float, dict]] | None:
         key = (r, s)
@@ -69,6 +64,8 @@ class SingleStageData:
 @dataclass
 class StageData:
     stages: Sequence[SingleStageData]
+    round_winner_fn: Callable
+
     max_rounds: int = 100
     train_timeout: int = 60 * 60 * 24 * 4  # days
     round_timeout: int = 60 * 60 * 4  # hours

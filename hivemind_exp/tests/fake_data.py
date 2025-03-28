@@ -1,8 +1,8 @@
 from copy import deepcopy
-from hivemind_exp.utils import COORDINATOR_KEY
+
 from hivemind_exp.dht_utils import ROUND_STAGE_NUMBER_KEY
 
-CK = COORDINATOR_KEY
+CK = "GENSYN"
 RSK = ROUND_STAGE_NUMBER_KEY
 
 QUESTION = "What is the meaning of life?"

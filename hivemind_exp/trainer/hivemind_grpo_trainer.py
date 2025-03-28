@@ -86,7 +86,7 @@ class HivemindGRPOTrainer:
                 value=self.stage_rewards,
                 expiration_time=get_dht_time() + self.node.out_expiration,
             )
-            if self.node.is_coordinator():
+            if self.node.is_coordinator:
                 self.publish_leaderboard()
 
             return loss
@@ -115,10 +115,7 @@ class HivemindGRPOTrainer:
             tokenizer.pad_token = tokenizer.eos_token
 
     def _log_tag(self):
-        node_uuid = self.node.uuid
-        if self.node.is_coordinator():
-            return f"[C-{node_uuid}]"
-        return f"[F-{node_uuid}]"
+        return f"[{self.node.uuid}]"
 
     def wait_for(self, result_fn=lambda: None, interval=10, timeout=30):
         start_time = time.monotonic()
@@ -198,6 +195,7 @@ class HivemindGRPOTrainer:
         trainer.model.config.use_cache = True
         trainer.save_model(self.config.output_dir)
         logger.info(f"{tag} Model saved to {self.config.output_dir}")
+        assert self.config.distributed_state
         self.config.distributed_state.wait_for_everyone()  # wait for all processes to load
 
         self.tokenizer.save_pretrained(self.config.output_dir)
@@ -208,6 +206,9 @@ class HivemindGRPOTrainer:
             trainer.create_model_card(
                 {"tags": ["rl", "grpo", "tutorial", "philschmid"]}
             )
+
+    def get_round_and_stage(self):
+        return get_round_and_stage(self.dht)
 
     def coordinator_train(self):
         tag = self._log_tag()
@@ -241,10 +242,10 @@ class HivemindGRPOTrainer:
 
             # Retrieve current round and stage.
             try:
-                round_num, stage = get_round_and_stage(self.dht)
-            except:
+                round_num, stage = self.get_round_and_stage()
+            except Exception as e:
                 if curr_time - fetch_log_time > 5:
-                    logger.info(f"{tag} Could not fetch round and stage. Skipping.")
+                    logger.debug(f"{tag} Could not fetch round and stage: {e}")
                     fetch_log_time = curr_time
 
                 time.sleep(check_interval)
@@ -268,12 +269,12 @@ class HivemindGRPOTrainer:
 
     def train(self):
         try:
-            if self.node.is_coordinator():
+            if self.node.is_coordinator:
                 self.coordinator_train()
             else:
                 self.follower_train()
 
-        except:
+        except Exception:
             import traceback
 
             traceback.print_exc()

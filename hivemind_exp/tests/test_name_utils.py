@@ -13,6 +13,6 @@ def test_get_name_from_uuid():
     assert get_name_from_uuid(str(id1)) == "stocky ladybug"
     assert get_name_from_uuid(str(id2)) == "playful caribou"
 
-def test_search_():
+def test_search_uuid_for_name():
     assert search_uuid_for_name(TEST_UUIDS, "none") is None
     assert search_uuid_for_name(TEST_UUIDS, "stocky ladybug") == TEST_UUIDS[1]

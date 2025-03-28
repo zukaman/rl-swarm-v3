@@ -1,25 +1,25 @@
-from enum import Enum
 import itertools
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 import time
+from concurrent.futures import ThreadPoolExecutor
+from enum import Enum
+from pathlib import Path
 
 import hivemind
 import pytest
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from trl import GRPOConfig
+from datasets import Dataset
 from hivemind.dht import DHT
 from hivemind.utils import get_dht_time
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from trl import GRPOConfig
 
-from datasets import Dataset
-
+from hivemind_exp.dht_utils import outputs_key
 from hivemind_exp.gsm8k.stage_utils import (
     HivemindNode,
-    merge_stage1_question,
-    merge_stage2_question,
     get_stage2_samples,
     get_stage3_samples,
     gsm8k_stage_data,
+    merge_stage1_question,
+    merge_stage2_question,
     merged_prev_stage_datasets,
     rewards_key,
 )
@@ -28,15 +28,14 @@ from hivemind_exp.tests.fake_data import (
     QUESTION,
     RSK,
     SAMPLES,
-    STAGE_2_OUTPUTS,
     STAGE_2_MERGED,
+    STAGE_2_OUTPUTS,
     samples_with_uuid,
 )
 from hivemind_exp.trainer.hivemind_grpo_trainer import (
     HivemindGRPOTrainer,
     get_dht_value,
 )
-from hivemind_exp.dht_utils import outputs_key
 from hivemind_exp.utils import SingleStageData
 
 TEST_MODEL_NAME = "trl-internal-testing/tiny-Qwen2ForCausalLM-2.5"
@@ -167,8 +166,8 @@ def test_merged_prev_stage_datasets(
     merge_fn, sample_fn, stage, samples, group_field, get_expected_fn
 ):
     dht = hivemind.DHT(start=True)
-    coord = HivemindNode.coordinator("test")
-    node = HivemindNode("test")
+    coord = HivemindNode.coordinator("test", CK)
+    node = HivemindNode("test", "0")
 
     def merge_coord():
         return merged_prev_stage_datasets(dht, coord, 0, stage + 1, merge_fn, sample_fn)
@@ -218,8 +217,8 @@ def test_merged_prev_stage_datasets(
 
 
 def test_gsm8k_stage_data(tmp_path):
-    coord = HivemindNode.coordinator("test")
-    nodes = [HivemindNode("test") for _ in range(3)]
+    coord = HivemindNode.coordinator("test", CK)
+    nodes = [HivemindNode("test", str(i)) for i in range(3)]
 
     dht_trainers = [create_dht_and_trainer(Path(tmp_path) / "C", coord, min_peers=2)]
     dht0 = dht_trainers[0][0]
@@ -276,8 +275,8 @@ def test_gsm8k_stage_data(tmp_path):
 
 
 def test_gsm8k_delayed_join(tmp_path):
-    node0 = HivemindNode.coordinator("test")
-    node1 = HivemindNode("test")
+    node0 = HivemindNode.coordinator("test", CK)
+    node1 = HivemindNode("test", "0")
 
     dht0, trainer0 = create_dht_and_trainer(Path(tmp_path) / "0", node0)
     dht1, trainer1 = create_dht_and_trainer(

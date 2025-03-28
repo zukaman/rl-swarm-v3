@@ -1,6 +1,11 @@
-from collections import defaultdict
 import logging
 import time
+from collections import defaultdict
+from typing import Sequence
+
+import hivemind_exp.gsm8k.stage1_rewards as stage1_rewards
+import hivemind_exp.gsm8k.stage2_rewards as stage2_rewards
+import hivemind_exp.gsm8k.stage3_rewards as stage3_rewards
 from hivemind_exp.dht_utils import (
     DHT,
     HivemindNode,
@@ -8,9 +13,6 @@ from hivemind_exp.dht_utils import (
     get_outputs,
     rewards_key,
 )
-import hivemind_exp.gsm8k.stage1_rewards as stage1_rewards
-import hivemind_exp.gsm8k.stage2_rewards as stage2_rewards
-import hivemind_exp.gsm8k.stage3_rewards as stage3_rewards
 from hivemind_exp.gsm8k.generate_prompts import get_stage2_samples, get_stage3_samples
 from hivemind_exp.gsm8k.stage_merger import (
     Any,
@@ -111,7 +113,36 @@ def gsm8k_stage_data(
             dht, node, r, s, merge_stage2_question, get_stage3_samples
         )
 
+    def round_winners(limit = 10) -> Sequence[str]:
+        final_stage_outputs, _ = merged_prev_stage_datasets(
+            dht,
+            node,
+            node.round_num,
+            3,
+            lambda x: x,
+            lambda v: (v, v),
+        )
+        rewards = defaultdict(float)
+        for outputs in final_stage_outputs:
+            for node_uuid, output in outputs.items():
+                prompts = [
+                    [
+                        {"role": "system", "content": output["question"]},
+                        {"role": "system", "content": output["stage3_prompt"]},
+                    ],
+                ]
+                final_answer = next(iter(output["final_agent_decision"].items()))[1]
+                completions = [[{"role": "assistant", "content": final_answer}]]
+                cumulative_reward_2(
+                    prompts=prompts, completions=completions, **output
+                )
+                rewards[node_uuid] += sum(node.rewards)
+
+        rewards = sorted(list(rewards.items()), key=lambda x: x[1], reverse=True)
+        return [ n for n, _ in rewards ][:limit]
+
     return StageData(
+        round_winner_fn=round_winners,
         stages=[
             SingleStageData(
                 name="0",
