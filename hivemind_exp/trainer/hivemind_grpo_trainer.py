@@ -17,6 +17,7 @@ from hivemind_exp.dht_utils import (
     rewards_key,
 )
 from hivemind_exp.utils import HivemindNode, StageData
+from hivemind_exp.name_utils import get_name_from_uuid
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,7 @@ class HivemindGRPOTrainer:
         self.stage_data = stage_data
 
         self.config = config
+        self.config.output_dir += f"-{get_name_from_uuid(str(self.node.uuid))}" #TODO: Add animal name to save path in more appropriate spot
         self.model = model
         self.tokenizer = tokenizer
         if tokenizer.pad_token is None:
@@ -201,11 +203,17 @@ class HivemindGRPOTrainer:
         self.tokenizer.save_pretrained(self.config.output_dir)
         logger.info(f"{tag} Tokenizer saved to {self.config.output_dir}")
 
-        # Save everything else on main process
+        # Push to HF hub if desired
         if trainer.accelerator.is_main_process:
             trainer.create_model_card(
-                {"tags": ["rl", "grpo", "tutorial", "philschmid"]}
+                {"tags": ["rl", "grpo", "gensyn", "swarm"]}
             )
+        if (self.config.push_to_hub_token != None): #TODO: Come back and add additional logic checking if they've provided access token+HF username
+            logger.info("Pushing model to Hugging Face Hub...")
+            try:
+                trainer.push_to_hub()
+            except:
+                logger.info("Failed to push model to the Hugging Face Hub. When you conclude training please try manually pushing it yourself using the instructions here: https://huggingface.co/docs/hub/en/models-uploading")
 
     def get_round_and_stage(self):
         return get_round_and_stage(self.dht)

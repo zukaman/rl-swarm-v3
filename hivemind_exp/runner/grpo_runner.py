@@ -7,6 +7,7 @@ import hivemind
 from datasets import Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import GRPOConfig, ModelConfig
+from huggingface_hub import login
 
 from hivemind_exp.gsm8k.stage_utils import gsm8k_stage_data
 from hivemind_exp.trainer.hivemind_grpo_trainer import HivemindGRPOTrainer
@@ -33,6 +34,9 @@ class GRPOArguments:
     tokenizer_name_or_path: str | None = None
     number_of_data_samples: int = 50000
     public_maddr: str | None = None
+
+    #Hugging Face Hub arguments
+    hf_token: str | None = None
 
 
 class GRPORunner:
@@ -95,6 +99,15 @@ class GRPORunner:
         batch_size = 2
         training_args.per_device_train_batch_size = batch_size
         training_args.num_generations = batch_size
+
+        ############################
+        # Log into HF hub if wanted
+        ############################
+        if (grpo_args.hf_token not in [None, "None"]):
+            training_args.push_to_hub_token = grpo_args.hf_token
+            login(token=training_args.push_to_hub_token, add_to_git_credential=True)
+        else:
+            training_args.push_to_hub_token = None
 
         ################
         # Load tokenizer
