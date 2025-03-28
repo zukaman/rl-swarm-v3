@@ -7,7 +7,7 @@ import hivemind
 from datasets import Dataset
 from trl import GRPOConfig, ModelConfig
 
-from hivemind_exp.gensyn import coordinator_contract, setup_account, setup_web3
+from hivemind_exp.gensyn import coordinator_contract, send_chain_txn, setup_account, setup_web3
 from hivemind_exp.runner.grpo_runner import GRPOArguments, GRPORunner
 from hivemind_exp.trainer.gensyn.testnet_grpo_trainer import TestnetGRPOTrainer
 
@@ -31,13 +31,27 @@ class TestnetGRPORunner(GRPORunner):
     def get_initial_peers(self) -> list[str]:
         return self.contract.functions.getBootnodes().call()
 
+    def register_peer(self, peer_id):
+        logger.info(f"Registering self with peer ID: {peer_id}")
+        send_chain_txn(
+            self.web3,
+            self.account,
+            lambda: self.contract.functions.registerPeer(peer_id).build_transaction(
+                {
+                    "gas": 500000,
+                    "gasPrice": self.web3.to_wei("50", "gwei"),
+                }
+            ),
+        )
+
     def setup_dht(self, grpo_args):
         initial_peers = grpo_args.initial_peers
         if not initial_peers:
-            raise ValueError("Cannot locate on-chain initial peers. Exiting.")
+            logger.info("Cannot locate on-chain initial peers; running alone.")
 
         dht = hivemind.DHT(start=True, **self._dht_kwargs(grpo_args))
         logger.info(f"Joining swarm with initial_peers = {initial_peers}")
+        self.register_peer(str(dht.peer_id))
         return dht
 
     def run(

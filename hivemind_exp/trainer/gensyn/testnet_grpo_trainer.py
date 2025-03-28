@@ -16,22 +16,6 @@ class TestnetGRPOTrainer(HivemindGRPOTrainer):
         self.account = account
         self.contract = contract
         super().__init__(**kwargs)
-        self.register_peer()
-
-    def register_peer(self):
-        logger.info(f"Registering self with peer ID: {self.node.uuid}")
-        send_chain_txn(
-            self.web3,
-            self.account,
-            lambda: self.contract.functions.registerPeer(
-                self.node.uuid
-            ).build_transaction(
-                {
-                    "gas": 500000,
-                    "gasPrice": self.web3.to_wei("50", "gwei"),
-                }
-            ),
-        )
 
     def submit_winners(self, round_num: int, winners: Sequence[str]):
         logger.info(f"Submitting winners for round {round_num}: {winners}")
