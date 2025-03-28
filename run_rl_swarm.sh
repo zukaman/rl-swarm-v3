@@ -64,14 +64,12 @@ fi
 echo ">> Done!"
 echo ""
 echo ""
-while true; do
-    read -p "Would you like to push models you train in the RL swarm to the Hugging Face Hub? [y/N] " yn
-    case $yn in
-        [Yy]* ) read -p "Enter your Hugging Face access token: " HUGGINGFACE_ACCESS_TOKEN && break;;
-        [Nn]* ) HUGGINGFACE_ACCESS_TOKEN="None" && break;;
-        * ) echo ">>> Please answer yes or no.";;
-    esac
-done
+read -p "Would you like to push models you train in the RL swarm to the Hugging Face Hub? [y/N] " yn
+case $yn in
+   [Yy]* ) read -p "Enter your Hugging Face access token: " HUGGINGFACE_ACCESS_TOKEN;;
+   [Nn]* ) HUGGINGFACE_ACCESS_TOKEN="None";;
+   * ) echo ">>> No answer was given, so NO models will be pushed to Hugging Face Hub" && HUGGINGFACE_ACCESS_TOKEN="None";;
+esac
 echo ""
 echo ""
 echo "Good luck in the swarm!"

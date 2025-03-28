@@ -110,7 +110,7 @@ class HivemindGRPOTrainer:
         self.stage_data = stage_data
 
         self.config = config
-        self.config.output_dir += f"-{get_name_from_uuid(str(self.node.uuid))}" #TODO: Add animal name to save path in more appropriate spot
+        self.config.output_dir += f"-{"_".join(get_name_from_uuid(str(self.node.uuid)).split(' '))}" #TODO: Add animal name to save path in more appropriate spot
         self.model = model
         self.tokenizer = tokenizer
         if tokenizer.pad_token is None:
@@ -204,14 +204,10 @@ class HivemindGRPOTrainer:
         logger.info(f"{tag} Tokenizer saved to {self.config.output_dir}")
 
         # Push to HF hub if desired
-        if trainer.accelerator.is_main_process:
-            trainer.create_model_card(
-                {"tags": ["rl", "grpo", "gensyn", "swarm"]}
-            )
         if (self.config.push_to_hub_token != None): #TODO: Come back and add additional logic checking if they've provided access token+HF username
             logger.info("Pushing model to Hugging Face Hub...")
             try:
-                trainer.push_to_hub()
+                trainer.push_to_hub(tags=["rl-swarm", "grpo", "gensyn", f"I am {get_name_from_uuid(str(self.node.uuid))}"])
             except:
                 logger.info("Failed to push model to the Hugging Face Hub. When you conclude training please try manually pushing it yourself using the instructions here: https://huggingface.co/docs/hub/en/models-uploading")
 
