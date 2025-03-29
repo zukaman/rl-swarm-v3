@@ -10,9 +10,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import GRPOConfig, ModelConfig
 
 from hivemind_exp.gsm8k.stage_utils import gsm8k_stage_data
+from hivemind_exp.hivemind_utils import HivemindNode
 from hivemind_exp.name_utils import get_name_from_uuid
 from hivemind_exp.trainer.hivemind_grpo_trainer import HivemindGRPOTrainer
-from hivemind_exp.utils import HivemindNode
 
 logger = logging.getLogger(__name__)
 

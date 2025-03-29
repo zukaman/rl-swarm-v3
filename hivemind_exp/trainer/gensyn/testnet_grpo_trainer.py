@@ -1,41 +1,20 @@
 from typing import Sequence
 
-from eth_account import Account
-from web3 import Web3
-
-from hivemind_exp.chain_utils import send_chain_txn
+from hivemind_exp.chain_utils import SwarmCoordinator
 from hivemind_exp.trainer.hivemind_grpo_trainer import HivemindGRPOTrainer
 
 
 class TestnetGRPOTrainer(HivemindGRPOTrainer):
-    def __init__(self, web3: Web3, account: Account, contract, **kwargs) -> None:
-        self.web3 = web3
-        self.account = account
-        self.contract = contract
+    def __init__(self, coordinator: SwarmCoordinator, **kwargs) -> None:
+        self.coordinator = coordinator
         super().__init__(**kwargs)
 
     def submit_winners(self, round_num: int, winners: Sequence[str]):
         self.logger.info(f"🏆 Submitting winners for round {round_num}: {winners}")
-        send_chain_txn(
-            self.web3,
-            self.account,
-            lambda: self.contract.functions.submitWinners(
-                round_num, winners
-            ).build_transaction(
-                {
-                    "gas": 500000,
-                    "gasPrice": self.web3.to_wei("50", "gwei"),
-                }
-            ),
-        )
+        self.coordinator.submit_winners(round_num, winners)
 
     def get_round_and_stage(self):
-        with self.web3.batch_requests() as batch:
-            batch.add(self.contract.functions.currentRound())
-            batch.add(self.contract.functions.currentStage())
-            resp = batch.execute()
-
-        return resp[0], resp[1]
+        return self.coordinator.get_round_and_stage()
 
     def train_stages(self, round_num, start_stage, is_coordinator):
         super().train_stages(round_num, start_stage, is_coordinator)

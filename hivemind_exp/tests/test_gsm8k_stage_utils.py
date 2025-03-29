@@ -23,6 +23,7 @@ from hivemind_exp.gsm8k.stage_utils import (
     merged_prev_stage_datasets,
     rewards_key,
 )
+from hivemind_exp.hivemind_utils import SingleStageData
 from hivemind_exp.tests.fake_data import (
     CK,
     QUESTION,
@@ -36,7 +37,6 @@ from hivemind_exp.trainer.hivemind_grpo_trainer import (
     HivemindGRPOTrainer,
     get_dht_value,
 )
-from hivemind_exp.utils import SingleStageData
 
 TEST_MODEL_NAME = "trl-internal-testing/tiny-Qwen2ForCausalLM-2.5"
 

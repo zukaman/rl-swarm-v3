@@ -16,8 +16,8 @@ from hivemind_exp.dht_utils import (
     node_outputs_key,
     rewards_key,
 )
+from hivemind_exp.hivemind_utils import HivemindNode, StageData
 from hivemind_exp.name_utils import get_name_from_uuid
-from hivemind_exp.utils import HivemindNode, StageData
 
 
 class HivemindGRPOTrainer:
@@ -109,7 +109,8 @@ class HivemindGRPOTrainer:
         self.stage_data = stage_data
 
         self.config = config
-        self.config.output_dir += f"-{"_".join(get_name_from_uuid(str(self.node.uuid)).split(' '))}" #TODO: Add animal name to save path in more appropriate spot
+        assert self.config.output_dir
+        self.config.output_dir += f"-{get_name_from_uuid(self.node.uuid, True)}" #TODO: Add animal name to save path in more appropriate spot
         self.model = model
         self.tokenizer = tokenizer
         if tokenizer.pad_token is None:
@@ -203,7 +204,7 @@ class HivemindGRPOTrainer:
         if (self.config.push_to_hub_token != None): #TODO: Come back and add additional logic checking if they've provided access token+HF username
             self.logger.info("Pushing model to Hugging Face Hub...")
             try:
-                trainer.push_to_hub(tags=["rl-swarm", "grpo", "gensyn", f"I am {get_name_from_uuid(str(self.node.uuid))}"])
+                trainer.push_to_hub(tags=["rl-swarm", "grpo", "gensyn", f"I am {get_name_from_uuid(self.node.uuid)}"])
             except:
                 self.logger.info("Failed to push model to the Hugging Face Hub. When you conclude training please try manually pushing it yourself using the instructions here: https://huggingface.co/docs/hub/en/models-uploading")
 

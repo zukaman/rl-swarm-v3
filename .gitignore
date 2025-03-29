@@ -1,6 +1,9 @@
 .venv
 **/__pycache__/
-runs/
 .DS_Store
-api.ipynb
-SwarmCoordinator.json
+
+.env
+.next/
+temp-data/
+
+runs/

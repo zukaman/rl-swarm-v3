@@ -1,4 +1,5 @@
 #accelerate
+colorlog
 datasets
 #deepspeed
 hf-transfer

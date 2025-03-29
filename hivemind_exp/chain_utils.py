@@ -1,5 +1,6 @@
 import json
 import logging
+from abc import ABC
 
 import requests
 from eth_account import Account
@@ -15,46 +16,109 @@ SWARM_COORDINATOR_ABI_JSON = (
 )
 SWARM_COORDINATOR_CONTRACT = "0xcD1351B125b0ae4f023ADA5D09443087a7d99101"
 
+MODAL_PROXY_URL = "http://localhost:3000/api/"
+
 logger = logging.getLogger(__name__)
 
 
-def register_peer_via_api(peer_id):
-    """
-    Registers a peer with the given peer_id via an API call.
+class SwarmCoordinator(ABC):
+    @staticmethod
+    def coordinator_contract(web3: Web3):
+        with open(SWARM_COORDINATOR_ABI_JSON, "r") as f:
+            contract_abi = json.load(f)["abi"]
 
-    Args:
-        peer_id (str): The ID of the peer to register.
+        return web3.eth.contract(address=SWARM_COORDINATOR_CONTRACT, abi=contract_abi)
 
-    Returns:
-        None
-    """
+    def __init__(self, web3: Web3, **kwargs) -> None:
+        self.web3 = web3
+        self.contract = SwarmCoordinator.coordinator_contract(web3)
+        super().__init__(**kwargs)
 
-    # Define the API endpoint
-    url = "http://localhost:3000/api/register-peer"
+    def register_peer(self, peer_id): ...
 
-    # Define the file path to the userData.json file
-    user_data_file = "modal-login/temp-data/userData.json"
+    def submit_winners(self, round_num, winners): ...
 
-    # Load the orgId from the JSON file
-    with open(user_data_file, "r") as file:
-        user_data = json.load(file)
+    def get_bootnodes(self):
+        return self.contract.functions.getBootnodes().call()
 
-    # Define the payload
-    payload = {
-        "orgId": list(user_data.keys())[0],  # Replace with your organization ID
-        "peerId": peer_id,  # Replace with your peer ID
-    }
+    def get_round_and_stage(self):
+        with self.web3.batch_requests() as batch:
+            batch.add(self.contract.functions.currentRound())
+            batch.add(self.contract.functions.currentStage())
+            round_num, stage_num = batch.execute()
 
-    # Send the POST request
-    try:
-        response = requests.post(url, json=payload)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"API request failed: {e}")
-        print(f"Response status: {response.status_code}")
-        print(f"Response body: {response.text}")
-        raise
+        return round_num, stage_num
+
+
+class WalletSwarmCoordinator(SwarmCoordinator):
+    def __init__(self, private_key: str, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.account = setup_account(self.web3, private_key)
+
+    def _default_gas(self):
+        return {
+            "gas": 500000,
+            "gasPrice": self.web3.to_wei("50", "gwei"),
+        }
+
+    def register_peer(self, peer_id):
+        send_chain_txn(
+            self.web3,
+            self.account,
+            lambda: self.contract.functions.registerPeer(peer_id).build_transaction(
+                self._default_gas()
+            ),
+        )
+
+    def submit_winners(self, round_num, winners):
+        send_chain_txn(
+            self.web3,
+            self.account,
+            lambda: self.contract.functions.submitWinners(
+                round_num, winners
+            ).build_transaction(self._default_gas()),
+        )
+
+
+class ModalSwarmCoordinator(SwarmCoordinator):
+    def __init__(self, org_id: str, **kwargs) -> None:
+        self.org_id = org_id
+        super().__init__(**kwargs)
+
+    def register_peer(self, peer_id):
+        try:
+            send_via_api(self.org_id, "register-peer", {"peerId": peer_id})
+        except requests.exceptions.HTTPError as e:
+            if e.response is None or e.response.status_code != 500:
+                raise
+
+            # TODO: Verify actual contract errors.
+            logger.info(f"Peer ID [{peer_id}] is already registered! Continuing.")
+
+    def submit_winners(self, round_num, winners):
+        try:
+            send_via_api(
+                self.org_id,
+                "submit-winner",
+                {"roundNumber": round_num, "winners": winners},
+            )
+        except requests.exceptions.HTTPError as e:
+            if e.response is None or e.response.status_code != 500:
+                raise
+
+            # TODO: Verify actual contract errors.
+            logger.info("Winners already submitted for this round! Continuing.")
+
+
+def send_via_api(org_id, method, args):
+    # Construct URL and payload.
+    url = MODAL_PROXY_URL + method
+    payload = args | {"orgId": org_id}
+
+    # Send the POST request.
+    response = requests.post(url, json=payload)
+    response.raise_for_status()  # Raise an exception for HTTP errors
+    return response.json()
 
 
 def setup_web3() -> Web3:
@@ -76,14 +140,6 @@ def setup_account(web3: Web3, private_key) -> Account:
     return account
 
 
-def coordinator_contract(web3: Web3):
-    with open(SWARM_COORDINATOR_ABI_JSON, "r") as f:
-        contract_abi = json.load(f)["abi"]
-
-    return web3.eth.contract(address=SWARM_COORDINATOR_CONTRACT, abi=contract_abi)
-
-
-
 def send_chain_txn(
     web3: Web3, account: Account, txn_factory, chain_id=MAINNET_CHAIN_ID
 ):
@@ -99,4 +155,3 @@ def send_chain_txn(
     # Send the transaction
     tx_hash = web3.eth.send_raw_transaction(signed_txn.raw_transaction)
     logger.info(f"Sent transaction with hash: {web3.to_hex(tx_hash)}")
-

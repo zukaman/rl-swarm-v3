@@ -14,12 +14,12 @@ from hivemind_exp.dht_utils import (
     outputs_key,
     rewards_key,
 )
+from hivemind_exp.hivemind_utils import SingleStageData, StageData
 from hivemind_exp.tests.fake_data import CK, QUESTION, RSK, SAMPLES
 from hivemind_exp.trainer.hivemind_grpo_trainer import (
     HivemindGRPOTrainer,
     get_dht_value,
 )
-from hivemind_exp.utils import SingleStageData, StageData
 
 
 def dummy_reward_func(node: HivemindNode, prompts, completions, **kwargs) -> list[int]:

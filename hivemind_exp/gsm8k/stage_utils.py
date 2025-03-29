@@ -19,7 +19,7 @@ from hivemind_exp.gsm8k.stage_merger import (
     merge_stage1_question,
     merge_stage2_question,
 )
-from hivemind_exp.utils import SingleStageData, StageData
+from hivemind_exp.hivemind_utils import SingleStageData, StageData
 
 
 def merged_prev_stage_datasets(

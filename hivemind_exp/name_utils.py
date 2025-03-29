@@ -71,9 +71,12 @@ def hex_to_ints(s, k=2):
     return tuple(int(s[i:i+k], 16) for i in range(0, len(s), k))
 
 @lru_cache
-def get_name_from_uuid(uuid: str):
+def get_name_from_uuid(uuid: str, no_spaces = False):
     ints = hex_to_ints(hashlib.md5(uuid.encode()).hexdigest())
-    return f"{ADJECTIVES[ints[0] % len(ADJECTIVES)]} {ANIMALS[ints[1] % len(ANIMALS)]}"
+    name = f"{ADJECTIVES[ints[0] % len(ADJECTIVES)]} {ANIMALS[ints[1] % len(ANIMALS)]}"
+    if no_spaces:
+        name = "_".join(name.split(' '))
+    return name
 
 def search_uuid_for_name(uuids: Sequence[str], name):
     for uuid in uuids:

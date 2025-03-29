@@ -4,7 +4,7 @@ from typing import Any
 from hivemind.dht import DHT
 from hivemind.utils import ValueWithExpiration
 
-from hivemind_exp.utils import HivemindNode
+from hivemind_exp.hivemind_utils import HivemindNode
 
 ROUND_STAGE_NUMBER_KEY = "rl_swarm_rs"  # No subkeys. Coordinator publishes.
 

@@ -4,7 +4,7 @@ import re
 
 import numpy as np
 
-from hivemind_exp.utils import HivemindNode
+from hivemind_exp.hivemind_utils import HivemindNode
 
 
 def extract_xml_answer(text: str) -> str:

@@ -6,7 +6,7 @@ from difflib import SequenceMatcher
 import numpy as np
 
 import hivemind_exp.gsm8k.stage1_rewards as stage1_rewards
-from hivemind_exp.utils import HivemindNode
+from hivemind_exp.hivemind_utils import HivemindNode
 
 
 def extract_xml_identity(text: str) -> str:

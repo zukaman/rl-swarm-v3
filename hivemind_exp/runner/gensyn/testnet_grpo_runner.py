@@ -8,10 +8,7 @@ from datasets import Dataset
 from trl import GRPOConfig, ModelConfig
 
 from hivemind_exp.chain_utils import (
-    coordinator_contract,
-    send_chain_txn,
-    setup_account,
-    setup_web3,
+    SwarmCoordinator,
 )
 from hivemind_exp.runner.grpo_runner import GRPOArguments, GRPORunner
 from hivemind_exp.trainer.gensyn.testnet_grpo_trainer import TestnetGRPOTrainer
@@ -21,30 +18,20 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class TestnetGRPOArguments:
-    wallet_private_key: str | None = None  # EOA wallet private key
-
+    # Mutually exclusive.
+    wallet_private_key: str | None = None  # EOA wallet private key.
+    modal_org_id: str | None = None # Modal organization ID.
 
 class TestnetGRPORunner(GRPORunner):
-    def __init__(self, args: TestnetGRPOArguments) -> None:
-        self.web3 = setup_web3()
-        self.account = setup_account(self.web3, args.wallet_private_key)
-        self.contract = coordinator_contract(self.web3)
+    def __init__(self, coordinator: SwarmCoordinator) -> None:
+        self.coordinator = coordinator
 
     def get_initial_peers(self) -> list[str]:
-        return self.contract.functions.getBootnodes().call()
+        return self.coordinator.get_bootnodes()
 
     def register_peer(self, peer_id):
         logger.info(f"Registering self with peer ID: {peer_id}")
-        send_chain_txn(
-            self.web3,
-            self.account,
-            lambda: self.contract.functions.registerPeer(peer_id).build_transaction(
-                {
-                    "gas": 500000,
-                    "gasPrice": self.web3.to_wei("50", "gwei"),
-                }
-            ),
-        )
+        self.coordinator.register_peer(peer_id)
 
     def setup_dht(self, grpo_args):
         initial_peers = grpo_args.initial_peers
@@ -76,8 +63,6 @@ class TestnetGRPORunner(GRPORunner):
             initial_datasets_fn,
             partial(
                 TestnetGRPOTrainer,
-                web3=self.web3,
-                account=self.account,
-                contract=self.contract,
+                coordinator=self.coordinator
             ),
         )
