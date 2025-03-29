@@ -178,7 +178,7 @@ def test_multi_node_single_stage(tmp_path):
     assert rs == (max_rounds - 1, 0)
 
     for r, s in itertools.product([0], [0]):
-        outputs = get_dht_value(dht0, key=outputs_key(node0.uuid, r, s), latest=True)
+        outputs = get_dht_value(dht0, key=outputs_key(node0.key, r, s), latest=True)
         assert outputs
         assert outputs[QUESTION][1] == {"question": QUESTION}
 
@@ -186,7 +186,7 @@ def test_multi_node_single_stage(tmp_path):
         assert rewards
         assert len(rewards) == 2
         assert math.isclose(rewards[CK], 2.0 * max_steps)
-        assert math.isclose(rewards[node1.uuid], max_steps)
+        assert math.isclose(rewards[node1.key], max_steps)
 
         leaderboard = get_dht_value(dht0, key=leaderboard_key(r, s), latest=True)
         assert leaderboard
@@ -261,7 +261,7 @@ def test_multi_node_multi_stage(tmp_path):
     }
 
     for r, s in itertools.product(range(1), range(3)):
-        outputs = get_dht_value(dht0, key=outputs_key(node0.uuid, r, s), latest=False)
+        outputs = get_dht_value(dht0, key=outputs_key(node0.key, r, s), latest=False)
         assert outputs
         assert outputs[QUESTION][1] == {"question": QUESTION}
 
@@ -269,7 +269,7 @@ def test_multi_node_multi_stage(tmp_path):
         assert rewards
         assert len(rewards) == 2
         assert math.isclose(rewards[CK], 2.0 * max_steps)
-        assert math.isclose(rewards[node1.uuid], max_steps)
+        assert math.isclose(rewards[node1.key], max_steps)
 
         leaderboard = get_dht_value(dht0, key=leaderboard_key(r, s), latest=False)
         assert leaderboard

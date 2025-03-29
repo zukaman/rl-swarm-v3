@@ -31,7 +31,7 @@ from hivemind_exp.tests.fake_data import (
     SAMPLES,
     STAGE_2_MERGED,
     STAGE_2_OUTPUTS,
-    samples_with_uuid,
+    samples_with_key,
 )
 from hivemind_exp.trainer.hivemind_grpo_trainer import (
     HivemindGRPOTrainer,
@@ -79,11 +79,11 @@ def create_dht_and_trainer(tmp_path, node, min_peers=1, initial_peers=[]):
     # Always check stage merging.
 
     def check_merged_stage1_dataset(dataset: Dataset):
-        # print(f"Merged stage 1 for: {node.uuid}", dataset)
+        # print(f"Merged stage 1 for: {node.key}", dataset)
         check_dataset("agent_answers", min_peers, dataset)
 
     def check_merged_stage2_dataset(dataset: Dataset):
-        # print(f"Merged stage 2 for: {node.uuid}", dataset)
+        # print(f"Merged stage 2 for: {node.key}", dataset)
         check_dataset("agent_opinion", min_peers, dataset)
 
     stage_data = gsm8k_stage_data(dht, node, SAMPLES, SAMPLES)
@@ -103,11 +103,11 @@ def create_dht_and_trainer(tmp_path, node, min_peers=1, initial_peers=[]):
     return dht, trainer
 
 
-def store_dummy_rewards(dht: DHT, uuids, r, s):
-    for uuid in uuids:
+def store_dummy_rewards(dht: DHT, keys, r, s):
+    for key in keys:
         dht.store(
             key=rewards_key(r, s),
-            subkey=uuid,
+            subkey=key,
             value=[99],
             expiration_time=get_dht_time() + 60,
         )
@@ -124,7 +124,7 @@ def store_stage_outputs(
 ):
     if storage_mode in (StorageMode.DHT, StorageMode.BOTH):
         dht.store(
-            key=outputs_key(node.uuid, r, s),
+            key=outputs_key(node.key, r, s),
             subkey=QUESTION,
             value=(0, value),
             expiration_time=get_dht_time() + 120,
@@ -180,13 +180,13 @@ def test_merged_prev_stage_datasets(
         _ = merge_coord()
 
     # Training loop saves to both.
-    coord_samples = samples_with_uuid(CK, samples, group_field)
+    coord_samples = samples_with_key(CK, samples, group_field)
     store_stage_outputs(dht, coord, 0, stage, coord_samples[0], StorageMode.DHT)
     store_stage_outputs(
         dht, coord, 0, stage, coord_samples[1], StorageMode.NODE
     )  # Takes precedence.
 
-    node_samples = samples_with_uuid(node.uuid, samples, group_field)
+    node_samples = samples_with_key(node.key, samples, group_field)
     store_stage_outputs(
         dht, node, 0, stage, node_samples[0], StorageMode.NODE
     )  # Local only.
@@ -197,23 +197,23 @@ def test_merged_prev_stage_datasets(
 
     # Local.
     assert cf[f"{group_field}_{CK}"] == coord_expected
-    assert f"{group_field}_{node.uuid}" not in cf
+    assert f"{group_field}_{node.key}" not in cf
 
     # Local.
     assert f"{group_field}_{CK}" not in nf
-    assert nf[f"{group_field}_{node.uuid}"] == node_expected
+    assert nf[f"{group_field}_{node.key}"] == node_expected
 
     ## Check merged outputs with visible rewards!
-    store_dummy_rewards(dht, [coord.uuid, node.uuid], 0, stage)
+    store_dummy_rewards(dht, [coord.key, node.key], 0, stage)
     cf, nf = merge_coord()[0][0], merge_node()[0][0]
 
     # Local.
     assert cf[f"{group_field}_{CK}"] == coord_expected
-    assert f"{group_field}_{node.uuid}" not in cf
+    assert f"{group_field}_{node.key}" not in cf
 
     # Local + DHT.
     assert nf[f"{group_field}_{CK}"] == node_expected
-    assert nf[f"{group_field}_{node.uuid}"] == node_expected
+    assert nf[f"{group_field}_{node.key}"] == node_expected
 
 
 def test_gsm8k_stage_data(tmp_path):
@@ -265,13 +265,13 @@ def test_gsm8k_stage_data(tmp_path):
 
         for i in range(len(nodes)):
             check_outputs(
-                get_dht_value(dht0, key=outputs_key(nodes[i].uuid, r, s), latest=True),
+                get_dht_value(dht0, key=outputs_key(nodes[i].key, r, s), latest=True),
                 checks,
             )
 
         rewards = get_dht_value(dht0, key=rewards_key(r, s), latest=True)
         assert rewards
-        assert rewards.keys() == set([CK] + [node.uuid for node in nodes])
+        assert rewards.keys() == set([CK] + [node.key for node in nodes])
 
 
 def test_gsm8k_delayed_join(tmp_path):
@@ -301,11 +301,11 @@ def test_gsm8k_delayed_join(tmp_path):
     assert rs == (0, 2)  # 1 round, 3 stages
 
     for r, s in itertools.product(range(1), range(3)):
-        outputs0 = get_dht_value(dht1, key=outputs_key(node0.uuid, r, s), latest=True)
+        outputs0 = get_dht_value(dht1, key=outputs_key(node0.key, r, s), latest=True)
         assert outputs0
 
         if s > 0:
             outputs1 = get_dht_value(
-                dht0, key=outputs_key(node1.uuid, r, s), latest=True
+                dht0, key=outputs_key(node1.key, r, s), latest=True
             )
             assert outputs1

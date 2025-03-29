@@ -17,7 +17,7 @@ from hivemind_exp.dht_utils import (
     rewards_key,
 )
 from hivemind_exp.hivemind_utils import HivemindNode, StageData
-from hivemind_exp.name_utils import get_name_from_uuid
+from hivemind_exp.name_utils import get_name_from_peer_id
 
 
 class HivemindGRPOTrainer:
@@ -47,7 +47,7 @@ class HivemindGRPOTrainer:
                 self.dht, key=rewards_key(r, s), latest=True
             )
             if curr_rewards:
-                # Sorted list of (node_uuid, reward) pairs.
+                # Sorted list of (node_key, reward) pairs.
                 leaderboard = list(
                     sorted(
                         curr_rewards.items(), key=lambda t: (t[1], t[0]), reverse=True
@@ -81,7 +81,7 @@ class HivemindGRPOTrainer:
             self.stage_rewards += sum(self.node.rewards)
             self.dht.store(
                 key=rewards_key(self.node.round_num, self.node.stage_num),
-                subkey=self.node.uuid,
+                subkey=self.node.key,
                 value=self.stage_rewards,
                 expiration_time=get_dht_time() + self.node.out_expiration,
             )
@@ -110,14 +110,14 @@ class HivemindGRPOTrainer:
 
         self.config = config
         assert self.config.output_dir
-        self.config.output_dir += f"-{get_name_from_uuid(self.node.uuid, True)}" #TODO: Add animal name to save path in more appropriate spot
+        self.config.output_dir += f"-{get_name_from_peer_id(self.node.key, True)}" #TODO: Add animal name to save path in more appropriate spot
         self.model = model
         self.tokenizer = tokenizer
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
 
         if not log_tag:
-            log_tag = self.node.uuid
+            log_tag = self.node.key
 
         self.logger = logging.getLogger(f"{__name__}:{log_tag}")
 
@@ -204,7 +204,7 @@ class HivemindGRPOTrainer:
         if (self.config.push_to_hub_token != None): #TODO: Come back and add additional logic checking if they've provided access token+HF username
             self.logger.info("Pushing model to Hugging Face Hub...")
             try:
-                trainer.push_to_hub(tags=["rl-swarm", "grpo", "gensyn", f"I am {get_name_from_uuid(self.node.uuid)}"])
+                trainer.push_to_hub(tags=["rl-swarm", "grpo", "gensyn", f"I am {get_name_from_peer_id(self.node.key)}"])
             except:
                 self.logger.info("Failed to push model to the Hugging Face Hub. When you conclude training please try manually pushing it yourself using the instructions here: https://huggingface.co/docs/hub/en/models-uploading")
 

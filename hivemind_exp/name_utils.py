@@ -2,6 +2,7 @@ import hashlib
 from functools import lru_cache
 from typing import Sequence
 
+# fmt: off
 ADJECTIVES = [
     "agile", "alert", "amphibious", "aquatic", "arctic", "armored", "barky", "beaked",
     "bellowing", "bipedal", "bold", "bristly", "burrowing", "camouflaged", "carnivorous", "chattering",
@@ -40,8 +41,8 @@ ANIMALS = [
     "aardvark", "albatross", "alligator", "alpaca", "anaconda", "ant", "anteater", "antelope",
     "ape", "armadillo", "baboon", "badger", "barracuda", "bat", "bear", "beaver",
     "bee", "bison", "boar", "bobcat", "buffalo", "butterfly", "camel", "capybara",
-    "caribou", "cassowary", "cat", "caterpillar", "cheetah", "chicken", "chimpanzee", "chinchilla",
-    "clam", "cobra", "cockroach", "cod", "condor", "coral", "cougar", "cow",
+    "caribou", "cassowary", "cat", "caterpillar", "cheetah", "chicken", "chameleon", "chimpanzee",
+    "chinchilla", "clam", "cobra", "cockroach", "cod", "condor", "coral", "cougar", "cow",
     "coyote", "crab", "crane", "crocodile", "crow", "deer", "dingo", "dinosaur",
     "dog", "dolphin", "donkey", "dove", "dragonfly", "duck", "eagle", "eel",
     "elephant", "elk", "emu", "falcon", "ferret", "finch", "fish", "flamingo",
@@ -53,12 +54,12 @@ ANIMALS = [
     "lion", "lizard", "llama", "lobster", "locust", "lynx", "macaque", "macaw",
     "magpie", "mallard", "mammoth", "manatee", "mandrill", "mantis", "marmot", "meerkat",
     "mink", "mole", "mongoose", "monkey", "moose", "mosquito", "mouse", "mule",
-    "narwhal", "newt", "nightingale", "octopus", "okapi", "opossum", "orangutan", "ostrich",
+    "narwhal", "newt", "nightingale", "ocelot", "octopus", "okapi", "opossum", "orangutan", "ostrich",
     "otter", "owl", "ox", "panda", "panther", "parrot", "peacock", "pelican",
     "penguin", "pheasant", "pig", "pigeon", "piranha", "platypus", "porcupine", "porpoise",
-    "prairie dog", "prawn", "puffin", "puma", "python", "quail", "rabbit", "raccoon",
+    "prawn", "puffin", "puma", "python", "quail", "rabbit", "raccoon",
     "ram", "rat", "raven", "reindeer", "rhino", "robin", "rooster", "salamander",
-    "salmon", "sandpiper", "sardine", "scorpion", "seahorse", "seagull", "seal", "sealion",
+    "salmon", "sandpiper", "sardine", "scorpion", "seahorse", "seal", "sealion",
     "shark", "sheep", "shrew", "shrimp", "skunk", "sloth", "slug", "snail",
     "snake", "sparrow", "spider", "squid", "squirrel", "starfish", "stingray", "stork",
     "swan", "tamarin", "tapir", "tarantula", "termite", "tiger", "toad", "tortoise",
@@ -66,20 +67,33 @@ ANIMALS = [
     "walrus", "warthog", "wasp", "weasel", "whale", "wildebeest", "wolf", "wombat",
     "woodpecker", "worm", "yak", "zebra"
 ]
+# fmt: on
 
-def hex_to_ints(s, k=2):
-    return tuple(int(s[i:i+k], 16) for i in range(0, len(s), k))
+
+def hex_to_ints(s, k):
+    """Converts hex-encoded strings to int lists. Specify chunk size with k."""
+    return tuple(int(s[i : i + k], 16) for i in range(0, len(s), k))
+
+
+# libp2p peer IDs are always base58-encoded multihashes!
+
 
 @lru_cache
-def get_name_from_uuid(uuid: str, no_spaces = False):
-    ints = hex_to_ints(hashlib.md5(uuid.encode()).hexdigest())
-    name = f"{ADJECTIVES[ints[0] % len(ADJECTIVES)]} {ANIMALS[ints[1] % len(ANIMALS)]}"
+def get_name_from_peer_id(peer_id: str, no_spaces=False):
+    # ~200 entries for both lists; so 2 hex digits.
+    ints = hex_to_ints(hashlib.md5(peer_id.encode()).hexdigest(), 2)
+    adj1 = ADJECTIVES[ints[2] % len(ADJECTIVES)]
+    adj2 = ADJECTIVES[ints[1] % len(ADJECTIVES)]
+    animal = ANIMALS[ints[0] % len(ANIMALS)]
+
+    name = f"{adj1} {adj2} {animal}"
     if no_spaces:
-        name = "_".join(name.split(' '))
+        name = "_".join(name.split(" "))
     return name
 
-def search_uuid_for_name(uuids: Sequence[str], name):
-    for uuid in uuids:
-        if name == get_name_from_uuid(uuid):
-            return uuid
+
+def search_peer_ids_for_name(peer_ids: Sequence[str], name):
+    for peer_id in peer_ids:
+        if name == get_name_from_peer_id(peer_id):
+            return peer_id
     return None

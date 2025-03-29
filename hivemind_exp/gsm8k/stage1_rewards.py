@@ -149,7 +149,7 @@ def hivemind_cumulative_reward(
         output_data = {
             "question": prompts[0][-1]["content"],
             "answer": answer[0],
-            "agent_answers": {node.uuid: responses[maximal_reward_idx]},
+            "agent_answers": {node.key: responses[maximal_reward_idx]},
         }
 
     if output_signal_selector != None:

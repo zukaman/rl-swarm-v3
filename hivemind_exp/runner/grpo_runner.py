@@ -11,7 +11,7 @@ from trl import GRPOConfig, ModelConfig
 
 from hivemind_exp.gsm8k.stage_utils import gsm8k_stage_data
 from hivemind_exp.hivemind_utils import HivemindNode
-from hivemind_exp.name_utils import get_name_from_uuid
+from hivemind_exp.name_utils import get_name_from_peer_id
 from hivemind_exp.trainer.hivemind_grpo_trainer import HivemindGRPOTrainer
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class GRPORunner:
         return kwargs
 
     def _set_animal_name(self, peer_id):
-        animal_name = get_name_from_uuid(peer_id)
+        animal_name = get_name_from_peer_id(peer_id)
         logger.info(f"🐱 Assigning [{animal_name}] to peer ID [{peer_id}]")
         return animal_name
 

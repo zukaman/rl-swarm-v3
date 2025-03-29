@@ -34,7 +34,7 @@ def merged_prev_stage_datasets(
     log_tag=None,
 ):
     if not log_tag:
-        log_tag = node.uuid
+        log_tag = node.key
 
     logger = logging.getLogger(f"{__name__}:{log_tag}")
 
@@ -59,35 +59,35 @@ def merged_prev_stage_datasets(
     prev_outputs: dict[str, list] = defaultdict(list)
     try:
         prev_node_outputs = get_outputs(
-            dht, node.uuid, r, s - 1, node.get_stage_outputs
+            dht, node.key, r, s - 1, node.get_stage_outputs
         )
         for _, outputs in prev_node_outputs.values():
-            prev_outputs[node.uuid].append(outputs)
+            prev_outputs[node.key].append(outputs)
     except ValueError:
         # Joined after the round has started.
         logger.info(f"Could not retrieve local outputs for round {r} stage {s - 1}")
 
     # Add other nodes' samples iff rewards are available.
     if prev_rewards:
-        node_uuids = prev_rewards.keys()
-        for node_uuid in node_uuids:
-            if node_uuid == node.uuid:
+        node_keys = prev_rewards.keys()
+        for node_key in node_keys:
+            if node_key == node.key:
                 continue
             try:
-                prev_node_outputs = get_outputs(dht, node_uuid, r, s - 1)
+                prev_node_outputs = get_outputs(dht, node_key, r, s - 1)
                 for _, outputs in prev_node_outputs.values():
-                    prev_outputs[node_uuid].append(outputs)
+                    prev_outputs[node_key].append(outputs)
             except ValueError:
                 # Skip this node's answers for the current round and stage.
                 logger.info(
-                    f"Found rewards published for node: {node_uuid} but no outputs!"
+                    f"Found rewards published for node: {node_key} but no outputs!"
                 )
 
     #  Merge all samples.
     q_to_keyed_outputs: dict[str, dict[str, Any]] = defaultdict(dict)
-    for node_uuid, all_outputs in prev_outputs.items():
+    for node_key, all_outputs in prev_outputs.items():
         for outputs in all_outputs:
-            q_to_keyed_outputs[outputs["question"]][node_uuid] = outputs
+            q_to_keyed_outputs[outputs["question"]][node_key] = outputs
 
     for outputs in q_to_keyed_outputs.values():
         merged = merge_fn(outputs)
@@ -128,7 +128,7 @@ def gsm8k_stage_data(
         )
         rewards = defaultdict(float)
         for outputs in final_stage_outputs:
-            for node_uuid, output in outputs.items():
+            for node_key, output in outputs.items():
                 prompts = [
                     [
                         {"role": "system", "content": output["question"]},
@@ -138,7 +138,7 @@ def gsm8k_stage_data(
                 final_answer = next(iter(output["final_agent_decision"].items()))[1]
                 completions = [[{"role": "assistant", "content": final_answer}]]
                 cumulative_reward_2(prompts=prompts, completions=completions, **output)
-                rewards[node_uuid] += sum(node.rewards)
+                rewards[node_key] += sum(node.rewards)
 
         rewards = sorted(list(rewards.items()), key=lambda x: x[1], reverse=True)
         return [n for n, _ in rewards][:limit]
