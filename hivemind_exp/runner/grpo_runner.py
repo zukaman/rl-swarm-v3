@@ -5,20 +5,17 @@ from typing import Callable, Tuple
 
 import hivemind
 from datasets import Dataset
+from huggingface_hub import login
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import GRPOConfig, ModelConfig
-from huggingface_hub import login
 
 from hivemind_exp.gsm8k.stage_utils import gsm8k_stage_data
+from hivemind_exp.name_utils import get_name_from_uuid
 from hivemind_exp.trainer.hivemind_grpo_trainer import HivemindGRPOTrainer
 from hivemind_exp.utils import HivemindNode
 
 logger = logging.getLogger(__name__)
 
-
-########################
-# Custom dataclasses
-########################
 @dataclass
 class GRPOArguments:
     # Hivemind arguments
@@ -72,14 +69,21 @@ class GRPORunner:
 
         return kwargs
 
+    def _set_animal_name(self, peer_id):
+        animal_name = get_name_from_uuid(peer_id)
+        logger.info(f"🐱 Assigning [{animal_name}] to peer ID [{peer_id}]")
+        return animal_name
+
     def setup_dht(self, grpo_args):
         initial_peers = grpo_args.initial_peers
         dht = hivemind.DHT(start=True, **self._dht_kwargs(grpo_args))
         if initial_peers:
-            logger.info(f"Joining swarm with initial_peers = {initial_peers}")
+            logger.info(f"🐝 Joining swarm with initial_peers = {initial_peers}")
         else:
             first_visible = str(dht.get_visible_maddrs()[0])
-            logger.info(f"Starting swarm at {first_visible}")
+            logger.info(f"🤖 Starting swarm at {first_visible}")
+
+        self.name = self._set_animal_name(str(dht.peer_id))
         return dht
 
     def run(
@@ -152,13 +156,13 @@ class GRPORunner:
             tokenizer=tokenizer,
             config=training_args,
             stage_data=stage_data,
+            log_tag=self.name,
         )
 
         ###############
         # Training loop
         ###############
         logger.info(
-            f"*** Starting training {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} for {training_args.num_train_epochs} epochs***"
+            f"Starting training {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} for {training_args.num_train_epochs} epochs"
         )
         trainer.train()
-        logger.info("*** Training complete! ***")

@@ -1,13 +1,10 @@
-import logging
 from typing import Sequence
 
 from eth_account import Account
 from web3 import Web3
 
-from hivemind_exp.gensyn import send_chain_txn
+from hivemind_exp.chain_utils import send_chain_txn
 from hivemind_exp.trainer.hivemind_grpo_trainer import HivemindGRPOTrainer
-
-logger = logging.getLogger(__name__)
 
 
 class TestnetGRPOTrainer(HivemindGRPOTrainer):
@@ -18,7 +15,7 @@ class TestnetGRPOTrainer(HivemindGRPOTrainer):
         super().__init__(**kwargs)
 
     def submit_winners(self, round_num: int, winners: Sequence[str]):
-        logger.info(f"Submitting winners for round {round_num}: {winners}")
+        self.logger.info(f"🏆 Submitting winners for round {round_num}: {winners}")
         send_chain_txn(
             self.web3,
             self.account,

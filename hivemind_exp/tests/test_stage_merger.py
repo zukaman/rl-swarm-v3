@@ -1,7 +1,7 @@
 import pytest
 
-from hivemind_exp.tests.fake_data import *
 from hivemind_exp.gsm8k.stage_merger import *
+from hivemind_exp.tests.fake_data import *
 
 
 def test_merge_stage1():

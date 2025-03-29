@@ -1,9 +1,11 @@
+import os
+import random
 import re
-import os, random
+
 import numpy as np
 
-from hivemind_exp.utils import HivemindNode
 import hivemind_exp.gsm8k.stage1_rewards as stage1_rewards
+from hivemind_exp.utils import HivemindNode
 
 
 def extract_xml_identity(text: str) -> str:

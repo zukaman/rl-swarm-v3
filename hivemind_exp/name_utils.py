@@ -1,5 +1,5 @@
-from functools import lru_cache
 import hashlib
+from functools import lru_cache
 from typing import Sequence
 
 ADJECTIVES = [

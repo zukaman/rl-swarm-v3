@@ -7,16 +7,18 @@ import hivemind
 from datasets import Dataset
 from trl import GRPOConfig, ModelConfig
 
-from hivemind_exp.gensyn import coordinator_contract, send_chain_txn, setup_account, setup_web3
+from hivemind_exp.chain_utils import (
+    coordinator_contract,
+    send_chain_txn,
+    setup_account,
+    setup_web3,
+)
 from hivemind_exp.runner.grpo_runner import GRPOArguments, GRPORunner
 from hivemind_exp.trainer.gensyn.testnet_grpo_trainer import TestnetGRPOTrainer
 
 logger = logging.getLogger(__name__)
 
 
-########################
-# Custom dataclasses
-########################
 @dataclass
 class TestnetGRPOArguments:
     wallet_private_key: str | None = None  # EOA wallet private key
@@ -50,8 +52,11 @@ class TestnetGRPORunner(GRPORunner):
             logger.info("Cannot locate on-chain initial peers; running alone.")
 
         dht = hivemind.DHT(start=True, **self._dht_kwargs(grpo_args))
-        logger.info(f"Joining swarm with initial_peers = {initial_peers}")
-        self.register_peer(str(dht.peer_id))
+        logger.info(f"🐝 Joining swarm with initial_peers = {initial_peers}")
+
+        peer_id = str(dht.peer_id)
+        self.name = self._set_animal_name(peer_id)
+        self.register_peer(peer_id)
         return dht
 
     def run(

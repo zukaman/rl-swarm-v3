@@ -1,5 +1,7 @@
+import os
+import random
 import re
-import os, random
+
 import numpy as np
 
 from hivemind_exp.utils import HivemindNode

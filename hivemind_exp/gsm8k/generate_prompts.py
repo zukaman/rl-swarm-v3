@@ -1,8 +1,10 @@
-import os, random
-from datasets import load_dataset, Dataset
-
 #For geting top-k ranking for subsampling
 import hashlib
+import os
+import random
+
+from datasets import Dataset, load_dataset
+
 import hivemind_exp.gsm8k.stage1_rewards as stage1_rewards
 import hivemind_exp.gsm8k.stage2_rewards as stage2_rewards
 

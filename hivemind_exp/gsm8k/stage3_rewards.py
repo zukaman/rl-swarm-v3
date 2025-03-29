@@ -1,10 +1,12 @@
+import os
+import random
 import re
-import os, random
-import numpy as np
 from difflib import SequenceMatcher
 
-from hivemind_exp.utils import HivemindNode
+import numpy as np
+
 import hivemind_exp.gsm8k.stage1_rewards as stage1_rewards
+from hivemind_exp.utils import HivemindNode
 
 
 def extract_xml_identity(text: str) -> str:

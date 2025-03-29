@@ -1,9 +1,9 @@
+import copy
+
 import pytest
 
-from hivemind_exp.tests.fake_data import *
 from hivemind_exp.gsm8k.generate_prompts import *
-
-import copy
+from hivemind_exp.tests.fake_data import *
 
 
 def test_get_stage2_samples():

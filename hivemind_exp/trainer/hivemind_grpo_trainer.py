@@ -16,10 +16,8 @@ from hivemind_exp.dht_utils import (
     node_outputs_key,
     rewards_key,
 )
-from hivemind_exp.utils import HivemindNode, StageData
 from hivemind_exp.name_utils import get_name_from_uuid
-
-logger = logging.getLogger(__name__)
+from hivemind_exp.utils import HivemindNode, StageData
 
 
 class HivemindGRPOTrainer:
@@ -34,10 +32,12 @@ class HivemindGRPOTrainer:
             node: HivemindNode,
             dht: DHT,
             tokenizer,
+            logger,
             **kwargs,
         ):
             self.node = node
             self.dht = dht
+            self.logger = logger
             self.stage_rewards = 0.0
             super().__init__(processing_class=tokenizer, **kwargs)
 
@@ -59,9 +59,7 @@ class HivemindGRPOTrainer:
                     expiration_time=get_dht_time() + self.node.out_expiration,
                 )
             else:
-                logger.info(
-                    f"[{self.node.uuid}] Can't retrieve round {r} stage {s - 1} rewards"
-                )
+                self.logger.info(f"Can't retrieve round {r} stage {s - 1} rewards")
 
         def compute_loss(self, model, inputs, *args, **kwargs):
             loss = super().compute_loss(model, inputs, *args, **kwargs)
@@ -100,6 +98,7 @@ class HivemindGRPOTrainer:
         config: GRPOConfig,
         model,
         tokenizer,
+        log_tag=None,
         **kwargs,
     ):
         # The single coordinator is responsible for incrementing round + stage numbers.
@@ -116,8 +115,11 @@ class HivemindGRPOTrainer:
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
 
-    def _log_tag(self):
-        return f"[{self.node.uuid}]"
+        if not log_tag:
+            log_tag = self.node.uuid
+
+        self.logger = logging.getLogger(f"{__name__}:{log_tag}")
+
 
     def wait_for(self, result_fn=lambda: None, interval=10, timeout=30):
         start_time = time.monotonic()
@@ -132,9 +134,6 @@ class HivemindGRPOTrainer:
 
     def train_stages(self, round_num, start_stage, is_coordinator):
         # TODO: Needs checkpoint loading
-
-        tag = self._log_tag()
-
         self.node.round_num = round_num
         for i, stage in enumerate(self.stage_data.stages[start_stage:]):
             stage_num = start_stage + i
@@ -147,7 +146,7 @@ class HivemindGRPOTrainer:
                     expiration_time=get_dht_time() + self.node.out_expiration,
                 )
 
-            logger.info(f"{tag} Training round: {round_num} stage: {stage_num}")
+            self.logger.info(f"📈 Training round: {round_num} stage: {stage_num}")
             train_dataset, test_dataset = stage.datasets_fn(round_num, stage_num)
             kwargs = {
                 "model": self.model,
@@ -157,12 +156,10 @@ class HivemindGRPOTrainer:
                 "eval_dataset": test_dataset,
             }
             trainer = HivemindGRPOTrainer.PublishingGRPOTrainer(
-                self.node, self.dht, self.tokenizer, **kwargs
+                self.node, self.dht, self.tokenizer, self.logger, **kwargs
             )
             self.train_and_save(trainer, train_dataset)
-            logger.info(
-                f"{tag} Finished training round: {round_num} stage: {stage_num}"
-            )
+            self.logger.info(f"📉 Finished training round: {round_num} stage: {stage_num}")
 
         self.cleanup()
 
@@ -183,7 +180,6 @@ class HivemindGRPOTrainer:
         self.node.clear_stage_cache()
 
     def train_and_save(self, trainer, train_dataset):
-        tag = self._log_tag()
         train_result = trainer.train()
 
         # Log and save metrics
@@ -193,37 +189,35 @@ class HivemindGRPOTrainer:
         trainer.save_metrics("train", metrics)
         trainer.save_state()
 
-        logger.info(f"{tag} Saving model")
+        self.logger.info("Saving model")
         trainer.model.config.use_cache = True
         trainer.save_model(self.config.output_dir)
-        logger.info(f"{tag} Model saved to {self.config.output_dir}")
+        self.logger.info(f"Model saved to {self.config.output_dir}")
         assert self.config.distributed_state
         self.config.distributed_state.wait_for_everyone()  # wait for all processes to load
 
         self.tokenizer.save_pretrained(self.config.output_dir)
-        logger.info(f"{tag} Tokenizer saved to {self.config.output_dir}")
+        self.logger.info(f"Tokenizer saved to {self.config.output_dir}")
 
         # Push to HF hub if desired
         if (self.config.push_to_hub_token != None): #TODO: Come back and add additional logic checking if they've provided access token+HF username
-            logger.info("Pushing model to Hugging Face Hub...")
+            self.logger.info("Pushing model to Hugging Face Hub...")
             try:
                 trainer.push_to_hub(tags=["rl-swarm", "grpo", "gensyn", f"I am {get_name_from_uuid(str(self.node.uuid))}"])
             except:
-                logger.info("Failed to push model to the Hugging Face Hub. When you conclude training please try manually pushing it yourself using the instructions here: https://huggingface.co/docs/hub/en/models-uploading")
+                self.logger.info("Failed to push model to the Hugging Face Hub. When you conclude training please try manually pushing it yourself using the instructions here: https://huggingface.co/docs/hub/en/models-uploading")
 
     def get_round_and_stage(self):
         return get_round_and_stage(self.dht)
 
     def coordinator_train(self):
-        tag = self._log_tag()
-
         round_num = 0
         start_time = time.monotonic()
         while (
             round_num < self.stage_data.max_rounds
             and time.monotonic() - start_time < self.stage_data.train_timeout
         ):
-            logger.info(f"{tag} Starting new round: {round_num}")
+            self.logger.info(f"🤖 Starting new round: {round_num}")
 
             _ = self.dht.get_visible_maddrs(latest=True)
             self.train_stages(round_num, 0, is_coordinator=True)
@@ -232,11 +226,9 @@ class HivemindGRPOTrainer:
             if round_num == self.stage_data.max_rounds:
                 return
 
-        logger.info(f"{self._log_tag()} Training timed out!")
+        self.logger.info("Training timed out!")
 
     def follower_train(self, check_interval=1):
-        tag = self._log_tag()
-
         done_rounds = set()
         start_time = time.monotonic()
         fetch_log_time, finish_log_time = start_time, start_time
@@ -249,27 +241,27 @@ class HivemindGRPOTrainer:
                 round_num, stage = self.get_round_and_stage()
             except Exception as e:
                 if curr_time - fetch_log_time > 5:
-                    logger.debug(f"{tag} Could not fetch round and stage: {e}")
+                    self.logger.debug(f"Could not fetch round and stage: {e}")
                     fetch_log_time = curr_time
 
                 time.sleep(check_interval)
                 continue
 
             if round_num not in done_rounds:
-                logger.info(
-                    f"{tag} Joining round: {round_num} starting at stage: {stage}"
+                self.logger.info(
+                    f"🐝 Joining round: {round_num} starting at stage: {stage}"
                 )
                 self.train_stages(round_num, stage, is_coordinator=False)
                 done_rounds.add(round_num)
             else:
                 if curr_time - finish_log_time > 5:
-                    logger.info(f"{tag} Already finished round: {round_num}. Skipping.")
+                    self.logger.info(f"Already finished round: {round_num}. Skipping.")
                     finish_log_time = curr_time
 
             if round_num == self.stage_data.max_rounds - 1:
                 return
 
-        logger.info(f"{self._log_tag()} Training timed out!")
+        self.logger.info("Training timed out!")
 
     def train(self):
         try:

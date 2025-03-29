@@ -9,7 +9,7 @@ import torch
 class HivemindNode:
     # Node metadata.
     model_name: str
-    uuid: str # Usually set to node PeerID.
+    uuid: str  # Usually set to node PeerID.
 
     is_coordinator: bool = False
 
