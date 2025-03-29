@@ -7,6 +7,8 @@ export PUB_MULTI_ADDRS
 export PEER_MULTI_ADDRS
 export HOST_MULTI_ADDRS
 export IDENTITY_PATH
+export CONNECT_TO_TESTNET
+export ORG_ID
 
 #Check if public multi-address is given else set to default
 DEFAULT_PUB_MULTI_ADDRS=""
@@ -25,25 +27,49 @@ HOST_MULTI_ADDRS=${HOST_MULTI_ADDRS:-$DEFAULT_HOST_MULTI_ADDRS}
 DEFAULT_IDENTITY_PATH=""
 IDENTITY_PATH=${IDENTITY_PATH:-$DEFAULT_IDENTITY_PATH}
 
-# run modal_login server
-echo "Please login to create an Ethereum Server Wallet"
-cd modal-login
-yarn install
-yarn dev > /dev/null 2>&1 & # Run in background and suppress output
-#yarn dev &
-SERVER_PID=$!  # Store the process ID
-sleep 5
-open http://localhost:3000
-cd ..
+while true; do
+    read -p "Would you like to connect to the Testnet? [Y/n] " yn
+    yn=${yn:-Y}  # Default to "Y" if the user presses Enter
+    case $yn in
+        [Yy]* ) CONNECT_TO_TESTNET=True && break;;
+        [Nn]* ) CONNECT_TO_TESTNET=False && break;;
+        * ) echo ">>> Please answer yes or no.";;
+    esac
+done
 
-# Function to clean up the server process
-cleanup() {
-    echo "Shutting down server..."
-    kill $SERVER_PID
-    rm -r modal-login/temp-data/*.json
-    exit 0
-}
+if [ "$CONNECT_TO_TESTNET" = "True" ]; then
+    # run modal_login server
+    echo "Please login to create an Ethereum Server Wallet"
+    cd modal-login
+    yarn install
+    yarn dev > /dev/null 2>&1 & # Run in background and suppress output
+    #yarn dev &
+    SERVER_PID=$!  # Store the process ID
+    sleep 5
+    open http://localhost:3000
+    cd ..
 
+    # Wait until modal-login/temp-data/userData.json exists
+    while [ ! -f "modal-login/temp-data/userData.json" ]; do
+        echo "Waiting for userData.json to be created..."
+        sleep 5  # Wait for 5 seconds before checking again
+    done
+    echo "userData.json found. Proceeding..."
+
+    ORG_ID=$(jq -r 'keys[0]' modal-login/temp-data/userData.json)
+    echo "ORG_ID set to: $ORG_ID"
+
+    # Function to clean up the server process
+    cleanup() {
+        echo "Shutting down server..."
+        kill $SERVER_PID
+        rm -r modal-login/temp-data/*.json
+        exit 0
+    }
+
+    # Set up trap to catch Ctrl+C and call cleanup
+    trap cleanup INT
+fi
 #lets go!
 echo "Getting requirements..."
 pip install -r "$ROOT"/requirements-hivemind.txt
@@ -64,18 +90,19 @@ fi
 echo ">> Done!"
 echo ""
 echo ""
+
 read -p "Would you like to push models you train in the RL swarm to the Hugging Face Hub? [y/N] " yn
+yn=${yn:-N}  # Default to "N" if the user presses Enter
 case $yn in
    [Yy]* ) read -p "Enter your Hugging Face access token: " HUGGINGFACE_ACCESS_TOKEN;;
    [Nn]* ) HUGGINGFACE_ACCESS_TOKEN="None";;
    * ) echo ">>> No answer was given, so NO models will be pushed to Hugging Face Hub" && HUGGINGFACE_ACCESS_TOKEN="None";;
 esac
+
 echo ""
 echo ""
 echo "Good luck in the swarm!"
 
 python -m hivemind_exp.gsm8k.train_single_gpu --hf_token "$HUGGINGFACE_ACCESS_TOKEN" --identity_path "$IDENTITY_PATH" --public_maddr "$PUB_MULTI_ADDRS" --initial_peer "$PEER_MULTI_ADDRS" --host_maddr "$HOST_MULTI_ADDRS" --config "$CONFIG_PATH"
 
-# Set up trap to catch Ctrl+C and call cleanup
-trap cleanup INT
 wait  # Keep script running until Ctrl+C
