@@ -8,13 +8,15 @@ from threading import Thread
 import aiofiles
 import httpx
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+import json
 
 from hivemind_exp.dht_utils import *
+from hivemind_exp.name_utils import get_name_from_peer_id
 
-import global_dht
+from . import global_dht
 
 # UI is served from the filesystem
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -102,6 +104,68 @@ def get_leaderboard():
     leaderboard = global_dht.dht_cache.get_leaderboard()
     return dict(leaderboard)
 
+
+@app.get("/api/name-to-id")
+def get_id_from_name(name: str = Query("")):
+	global dht_cache
+	assert dht_cache
+
+	leaderboard = global_dht.dht_cache.get_leaderboard()
+	leader_ids = [leader["id"] for leader in leaderboard["leaders"]] or []
+
+	uuid = search_peer_ids_for_name(leader_ids, name)
+
+	return {
+		"id": uuid,
+	}
+
+@app.post("/api/id-to-name")
+async def id_to_name(request: Request):
+    # Check request body size (100KB limit)
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > 100 * 1024:  # 100KB in bytes
+        raise HTTPException(
+            status_code=413,
+            detail="Request body too large. Maximum size is 100KB."
+        )
+
+    # Parse request body
+    try:
+        body = await request.json()
+        if not isinstance(body, list):
+            raise HTTPException(
+                status_code=400,
+                detail="Request body must be a list of peer IDs"
+            )
+    except json.JSONDecodeError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid JSON: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid request body: {str(e)}"
+        )
+
+    # Validate input size
+    if len(body) > 1000:  # Limit number of IDs that can be processed
+        raise HTTPException(
+            status_code=400,
+            detail="Too many peer IDs. Maximum is 1000."
+        )
+
+    # Process each ID
+    id_to_name_map = {}
+    for peer_id in body:
+        try:
+            name = get_name_from_peer_id(peer_id)
+            if name is not None:
+                id_to_name_map[peer_id] = name
+        except Exception as e:
+            logger.error(f"Error looking up name for peer ID {peer_id}: {str(e)}")
+
+    return id_to_name_map
 
 @app.get("/api/gossip")
 def get_gossip():
