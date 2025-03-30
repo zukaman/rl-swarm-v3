@@ -87,6 +87,7 @@ class ModalSwarmCoordinator(SwarmCoordinator):
 
     def register_peer(self, peer_id):
         try:
+            print(peer_id)
             send_via_api(self.org_id, "register-peer", {"peerId": peer_id})
         except requests.exceptions.HTTPError as e:
             if e.response is None or e.response.status_code != 500:
@@ -97,10 +98,15 @@ class ModalSwarmCoordinator(SwarmCoordinator):
 
     def submit_winners(self, round_num, winners):
         try:
-            send_via_api(
+            d = (
                 self.org_id,
                 "submit-winner",
                 {"roundNumber": round_num, "winners": winners},
+            )
+
+            send_via_api(
+                *d
+
             )
         except requests.exceptions.HTTPError as e:
             if e.response is None or e.response.status_code != 500:
@@ -113,8 +119,9 @@ class ModalSwarmCoordinator(SwarmCoordinator):
 def send_via_api(org_id, method, args):
     # Construct URL and payload.
     url = MODAL_PROXY_URL + method
-    payload = args | {"orgId": org_id}
-
+    payload = {"orgId": org_id} | args
+    
+    print(payload)
     # Send the POST request.
     response = requests.post(url, json=payload)
     response.raise_for_status()  # Raise an exception for HTTP errors
