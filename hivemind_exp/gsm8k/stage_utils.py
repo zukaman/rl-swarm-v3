@@ -29,8 +29,8 @@ def merged_prev_stage_datasets(
     s: int,
     merge_fn,
     samples_fn,
-    wait_interval=1,
-    wait_timeout=5,
+    check_interval: float = 5,
+    wait_timeout: float = 10,
     log_tag=None,
 ):
     if not log_tag:
@@ -50,17 +50,15 @@ def merged_prev_stage_datasets(
     start_time = time.monotonic()
     while not prev_rewards and time.monotonic() - start_time < wait_timeout:
         logger.info(
-            f"Can't retrieve round {r} stage {s - 1} rewards; trying again in {wait_interval}s "
+            f"Can't retrieve round {r} stage {s - 1} rewards; trying again in {check_interval}s "
         )
-        time.sleep(wait_interval)
+        time.sleep(check_interval)
         prev_rewards = get_prev_rewards()
 
     # Add the current node's local samples first.
     prev_outputs: dict[str, list] = defaultdict(list)
     try:
-        prev_node_outputs = get_outputs(
-            dht, node.key, r, s - 1, node.get_stage_outputs
-        )
+        prev_node_outputs = get_outputs(dht, node.key, r, s - 1, node.get_stage_outputs)
         for _, outputs in prev_node_outputs.values():
             prev_outputs[node.key].append(outputs)
     except ValueError:
@@ -101,6 +99,7 @@ def gsm8k_stage_data(
     node: HivemindNode,
     initial_train_dataset,
     initial_test_dataset,
+    check_interval: float = 5,
     log_tag=None,
 ):
     def cumulative_reward_0(**kwargs):
@@ -114,17 +113,38 @@ def gsm8k_stage_data(
 
     def stage2_datasets_fn(r, s):
         return merged_prev_stage_datasets(
-            dht, node, r, s, merge_stage1_question, get_stage2_samples, log_tag=log_tag
+            dht,
+            node,
+            r,
+            s,
+            merge_stage1_question,
+            get_stage2_samples,
+            check_interval=check_interval,
+            log_tag=log_tag,
         )
 
     def stage3_datasets_fn(r, s):
         return merged_prev_stage_datasets(
-            dht, node, r, s, merge_stage2_question, get_stage3_samples, log_tag=log_tag
+            dht,
+            node,
+            r,
+            s,
+            merge_stage2_question,
+            get_stage3_samples,
+            check_interval=check_interval,
+            log_tag=log_tag,
         )
 
     def round_winners(limit=10) -> Sequence[str]:
         final_stage_outputs, _ = merged_prev_stage_datasets(
-            dht, node, node.round_num, 3, lambda x: x, lambda v: (v, v), log_tag=log_tag
+            dht,
+            node,
+            node.round_num,
+            3,
+            lambda x: x,
+            lambda v: (v, v),
+            check_interval=check_interval,
+            log_tag=log_tag,
         )
         rewards = defaultdict(float)
         for outputs in final_stage_outputs:

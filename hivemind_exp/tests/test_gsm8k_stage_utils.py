@@ -12,7 +12,7 @@ from hivemind.utils import get_dht_time
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import GRPOConfig
 
-from hivemind_exp.dht_utils import outputs_key
+from hivemind_exp.dht_utils import ROUND_STAGE_NUMBER_KEY, outputs_key
 from hivemind_exp.gsm8k.stage_utils import (
     HivemindNode,
     get_stage2_samples,
@@ -86,7 +86,7 @@ def create_dht_and_trainer(tmp_path, node, min_peers=1, initial_peers=[]):
         # print(f"Merged stage 2 for: {node.key}", dataset)
         check_dataset("agent_opinion", min_peers, dataset)
 
-    stage_data = gsm8k_stage_data(dht, node, SAMPLES, SAMPLES)
+    stage_data = gsm8k_stage_data(dht, node, SAMPLES, SAMPLES, check_interval=1)
     stage_data.max_rounds = 1
     stage_data.stages[0].datasets_fn = lambda r, s: (SAMPLES, SAMPLES)  # type: ignore
     wrap_datasets_fn(stage_data.stages[1], check_merged_stage1_dataset)
@@ -273,6 +273,23 @@ def test_gsm8k_stage_data(tmp_path):
         assert rewards
         assert rewards.keys() == set([CK] + [node.key for node in nodes])
 
+
+def test_gsm8k_follower_no_outputs(tmp_path):
+    node = HivemindNode.coordinator("test", CK)
+    dht, trainer = create_dht_and_trainer(Path(tmp_path) / "0", node)
+
+    dht.store(
+        key=ROUND_STAGE_NUMBER_KEY,
+        value=(0, 1),
+        expiration_time=get_dht_time() + node.out_expiration,
+    )
+    # It is possible for a node to see no local + no DHT outputs. Restarting at stage 0
+    # ensures that we have >1 examples for each stage.
+    trainer.follower_train(0.1)
+
+    # Check stage 0 outputs.
+    outputs = get_dht_value(dht, key=outputs_key(CK, 0, 0), latest=True)
+    assert outputs is not None
 
 def test_gsm8k_delayed_join(tmp_path):
     node0 = HivemindNode.coordinator("test", CK)

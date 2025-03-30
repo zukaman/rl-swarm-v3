@@ -3,6 +3,7 @@ import logging
 import time
 from typing import Any
 
+import datasets
 import torch
 from hivemind.dht import DHT
 from hivemind.utils import get_dht_time
@@ -241,7 +242,7 @@ class HivemindGRPOTrainer:
 
         self.logger.info("Training timed out!")
 
-    def follower_train(self, check_interval=1):
+    def follower_train(self, check_interval: float = 5, log_timeout: float = 10):
         done_rounds = set()
         start_time = time.monotonic()
         fetch_log_time, finish_log_time = start_time, start_time
@@ -253,7 +254,7 @@ class HivemindGRPOTrainer:
             try:
                 round_num, stage = self.get_round_and_stage()
             except Exception as e:
-                if curr_time - fetch_log_time > 5:
+                if curr_time - fetch_log_time > log_timeout:
                     self.logger.debug(f"Could not fetch round and stage: {e}")
                     fetch_log_time = curr_time
 
@@ -264,10 +265,20 @@ class HivemindGRPOTrainer:
                 self.logger.info(
                     f"🐝 Joining round: {round_num} starting at stage: {stage}"
                 )
-                self.train_stages(round_num, stage, is_coordinator=False)
+                try:
+                    self.train_stages(round_num, stage, is_coordinator=False)
+                except datasets.exceptions.DatasetGenerationError:
+                    if stage > 0:
+                        self.logger.info("Re-attempting training starting at stage 0!")
+
+                        # Start over from stage 0.
+                        self.train_stages(round_num, 0, is_coordinator=False)
+                    else:
+                        raise
+
                 done_rounds.add(round_num)
             else:
-                if curr_time - finish_log_time > 5:
+                if curr_time - finish_log_time > log_timeout:
                     self.logger.info(f"Already finished round: {round_num}. Skipping.")
                     finish_log_time = curr_time
 
