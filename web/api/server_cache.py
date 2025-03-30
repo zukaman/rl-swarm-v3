@@ -1,7 +1,10 @@
 import hashlib
 import itertools
-from hivemind_exp.dht_utils import *
 from datetime import datetime
+
+from gossip_utils import *
+
+from hivemind_exp.dht_utils import *
 
 
 class Cache:
@@ -11,12 +14,14 @@ class Cache:
         self.logger = logger
 
         self.lock = manager.Lock()
+        self.reset()
 
-        self.leaderboard = manager.dict()
-        self.gossips = manager.dict()
+    def reset(self):
+        self.leaderboard = self.manager.dict()
+        self.gossips = self.manager.dict()
 
-        self.current_round = manager.Value("i", -1)
-        self.current_stage = manager.Value("i", -1)
+        self.current_round = self.manager.Value("i", -1)
+        self.current_stage = self.manager.Value("i", -1)
 
         self.last_polled = None
 
@@ -26,7 +31,7 @@ class Cache:
     def get_leaderboard(self):
         return dict(self.leaderboard)
 
-    def get_gossips(self):
+    def get_gossips(self, since_round = 0):
         return dict(self.gossips)
 
     def get_last_polled(self):
@@ -41,7 +46,10 @@ class Cache:
             with self.lock:
                 self.last_polled = datetime.now()
         except Exception as e:
-            self.logger.error("cache failed to poll dht", e)
+            self.logger.error("cache failed to poll dht: %s", e)
+
+    def _get_dht_value(self, **kwargs):
+        return get_dht_value(self.dht, beam_size=100, **kwargs)
 
     def _get_round_and_stage(self):
         try:
@@ -52,17 +60,16 @@ class Cache:
                 self.current_stage.value = s
         except ValueError as e:
             self.logger.warning(
-                "could not get current round or stage; default to -1", e
+                "could not get current round or stage; default to -1: %s", e
             )
 
     def _get_leaderboard(self):
         try:
-            raw = get_dht_value(
-                self.dht,
+            raw = self._get_dht_value(
                 key=leaderboard_key(self.current_round.value, self.current_stage.value),
                 latest=True,
             )
-            
+
             # Create entries for all participants
             all_entries = [
                 {
@@ -76,56 +83,68 @@ class Cache:
             with self.lock:
                 self.leaderboard = {
                     "leaders": all_entries,
-                    "total": len(raw) if raw else 0
+                    "total": len(raw) if raw else 0,
                 }
         except Exception as e:
-            self.logger.warning("could not get leaderboard data", e)
-
+            self.logger.warning("could not get leaderboard data: %s", e)
 
     def _get_gossip(self):
         STAGE_GOSSIP_LIMIT = 20  # Most recent.
+        STAGE_MESSAGE_FNS = [
+            stage1_message, stage2_message, stage3_message
+        ]
+
         round_gossip = []
         try:
             # Basically a proxy for the reachable peer group.
-            curr_rewards: dict[str, Any] | None = get_dht_value(
-                self.dht,
-                key=rewards_key(self.current_round.value, self.current_stage.value),
-                latest=True,
+            curr_rewards: dict[str, Any] | None = self._get_dht_value(
+                key=rewards_key(self.current_round.value, self.current_stage.value)
             )
             if not curr_rewards:
                 raise ValueError("missing curr_rewards")
 
             nodes = curr_rewards.keys()
+            curr_round = self.current_round.value
+            curr_stage = self.current_stage.value
             start_round = (
-                0 if self.current_round.value < 20 else self.current_round.value - 20
+                0 if curr_round < 20 else curr_round - 20
             )
 
-            for round_num, stage, node_uuid in itertools.product(
-                range(start_round, self.current_round.value + 1),
-                range(0, self.current_stage.value + 1),
+            for round_num, stage, node_key in itertools.product(
+                range(start_round, curr_round + 1),
+                range(0, 3),
                 nodes,
             ):
-                key = outputs_key(node_uuid, round_num, stage)
-                if outputs := get_dht_value(self.dht, key=key, latest=False):
+                if round_num > curr_round or (round_num == curr_round and stage > curr_stage):
+                    break
+
+                key = outputs_key(node_key, round_num, stage)
+                if outputs := self._get_dht_value(key=key):
                     sorted_outputs = sorted(
                         list(outputs.items()), key=lambda t: t[1][0]
                     )
                     for question, (ts, outputs) in sorted_outputs[-STAGE_GOSSIP_LIMIT:]:
-                        id = hashlib.md5(
-                            f"{node_uuid}_{round_num}_{stage}_{question}".encode()
+                        gossip_id = hashlib.md5(
+                            f"{node_key}_{round_num}_{stage}_{question}".encode()
                         ).hexdigest()
+                        if stage < len(STAGE_MESSAGE_FNS):
+                            message = STAGE_MESSAGE_FNS[stage](node_key, question, ts, outputs)
+                        else:
+                            message = (
+                                f"Cannot render output for unknown stage {stage}"
+                            )
                         round_gossip.append(
                             (
                                 ts,
                                 {
-                                    "id": id,
-                                    "message": f"{question}...Answer: {outputs['answer']}",
-                                    "node": node_uuid,
+                                    "id": gossip_id,
+                                    "message": message,
+                                    "node": node_key,
                                 },
                             )
                         )
         except Exception as e:
-            self.logger.warning("could not get gossip", e)
+            self.logger.warning("could not get gossip: %s", e)
 
         with self.lock:
             self.gossips = {

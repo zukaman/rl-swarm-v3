@@ -1,30 +1,24 @@
-import aiofiles
 import argparse
-from datetime import datetime, timedelta
-import hivemind
 import logging
-from threading import Thread
-import multiprocessing
-from .server_cache import Cache
-from fastapi import FastAPI, Query, Request, Response, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-import uvicorn
-import httpx
 import os
 import time
+from datetime import datetime, timedelta
+from threading import Thread
+
+import aiofiles
+import httpx
+import uvicorn
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from hivemind_exp.dht_utils import *
+
+import global_dht
 
 # UI is served from the filesystem
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST_DIR = os.path.join(BASE_DIR, "ui", "dist")
-
-# DHT singleton for the client
-# Initialized in main and used in the API handlers.
-dht: hivemind.DHT | None = None
-
-dht_cache: Cache
 
 index_html = None
 
@@ -79,10 +73,7 @@ async def internal_server_error_handler(request: Request, exc: Exception):
 
 @app.get("/api/healthz")
 async def get_health():
-    global dht_cache
-    assert dht_cache
-
-    lpt = dht_cache.get_last_polled()
+    lpt = global_dht.dht_cache.get_last_polled()
     if lpt is None:
         raise HTTPException(status_code=500, detail="dht never polled")
 
@@ -98,10 +89,7 @@ async def get_health():
 
 @app.get("/api/round_and_stage")
 def get_round_and_stage():
-    global dht_cache
-    assert dht_cache
-
-    r, s = dht_cache.get_round_and_stage()
+    r, s = global_dht.dht_cache.get_round_and_stage()
 
     return {
         "round": r,
@@ -111,19 +99,13 @@ def get_round_and_stage():
 
 @app.get("/api/leaderboard")
 def get_leaderboard():
-    global dht_cache
-    assert dht_cache
-
-    leaderboard = dht_cache.get_leaderboard()
+    leaderboard = global_dht.dht_cache.get_leaderboard()
     return dict(leaderboard)
 
 
 @app.get("/api/gossip")
-def get_gossip(since_round: int = Query(0)):
-    global dht_cache
-    assert dht_cache
-
-    gs = dht_cache.get_gossips()
+def get_gossip():
+    gs = global_dht.dht_cache.get_gossips()
     return dict(gs)
 
 
@@ -186,13 +168,10 @@ def parse_arguments():
 
 def populate_cache():
     logger.info("populate_cache initialized")
-    global dht_cache
-    assert dht_cache
-
     try:
         while True:
             logger.info("pulling latest dht data...")
-            dht_cache.poll_dht()
+            global_dht.dht_cache.poll_dht()
             time.sleep(10)
             logger.info("dht polled")
     except Exception as e:
@@ -200,9 +179,6 @@ def populate_cache():
 
 
 def main(args):
-    global dht
-    global dht_cache
-
     # Allows either an environment variable for peering or fallback to command line args.
     initial_peers_env = os.getenv("INITIAL_PEERS", "")
     initial_peers_list = (
@@ -211,8 +187,7 @@ def main(args):
 
     # Supplied with the bootstrap node, the client will have access to the DHT.
     logger.info(f"initializing DHT with peers {initial_peers_list}")
-    dht = hivemind.DHT(start=True, initial_peers=initial_peers_list)
-    dht_cache = Cache(dht, multiprocessing.Manager(), logger)
+    global_dht.setup_global_dht(initial_peers_list, logger)
 
     thread = Thread(target=populate_cache)
     thread.daemon = True
