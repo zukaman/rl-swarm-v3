@@ -9,6 +9,7 @@ export HOST_MULTI_ADDRS
 export IDENTITY_PATH
 export CONNECT_TO_TESTNET
 export ORG_ID
+export HF_HUB_DOWNLOAD_TIMEOUT=120  # 2 minutes
 
 #Check if public multi-address is given else set to default
 DEFAULT_PUB_MULTI_ADDRS=""
