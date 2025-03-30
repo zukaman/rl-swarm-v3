@@ -110,7 +110,7 @@ class HivemindGRPOTrainer:
 
         self.config = config
         assert self.config.output_dir
-        self.config.output_dir += f"-{get_name_from_peer_id(self.node.key, True)}" #TODO: Add animal name to save path in more appropriate spot
+        self.config.output_dir += f"-{get_name_from_peer_id(self.node.key, True)}"  # TODO: Add animal name to save path in more appropriate spot
         self.model = model
         self.tokenizer = tokenizer
         if tokenizer.pad_token is None:
@@ -120,7 +120,6 @@ class HivemindGRPOTrainer:
             log_tag = self.node.key
 
         self.logger = logging.getLogger(f"{__name__}:{log_tag}")
-
 
     def wait_for(self, result_fn=lambda: None, interval=10, timeout=30):
         start_time = time.monotonic()
@@ -160,7 +159,28 @@ class HivemindGRPOTrainer:
                 self.node, self.dht, self.tokenizer, self.logger, **kwargs
             )
             self.train_and_save(trainer, train_dataset)
-            self.logger.info(f"📉 Finished training round: {round_num} stage: {stage_num}")
+            self.logger.info(
+                f"📉 Finished training round: {round_num} stage: {stage_num}"
+            )
+
+        # Push to HF hub if desired
+        # TODO: Come back and add additional logic checking if they've provided access token+HF username
+        if self.config.push_to_hub_token is not None:
+            self.logger.info("Pushing model to Hugging Face Hub...")
+            try:
+                trainer.push_to_hub(
+                    tags=[
+                        "rl-swarm",
+                        "grpo",
+                        "gensyn",
+                        f"I am {get_name_from_peer_id(self.node.key)}",
+                    ]
+                )
+                time.sleep(1)
+            except Exception:
+                self.logger.info(
+                    "Failed to push model to the Hugging Face Hub. When you conclude training please try manually pushing it yourself using the instructions here: https://huggingface.co/docs/hub/en/models-uploading"
+                )
 
         self.cleanup()
 
@@ -199,14 +219,6 @@ class HivemindGRPOTrainer:
 
         self.tokenizer.save_pretrained(self.config.output_dir)
         self.logger.info(f"Tokenizer saved to {self.config.output_dir}")
-
-        # Push to HF hub if desired
-        if (self.config.push_to_hub_token != None): #TODO: Come back and add additional logic checking if they've provided access token+HF username
-            self.logger.info("Pushing model to Hugging Face Hub...")
-            try:
-                trainer.push_to_hub(tags=["rl-swarm", "grpo", "gensyn", f"I am {get_name_from_peer_id(self.node.key)}"])
-            except:
-                self.logger.info("Failed to push model to the Hugging Face Hub. When you conclude training please try manually pushing it yourself using the instructions here: https://huggingface.co/docs/hub/en/models-uploading")
 
     def get_round_and_stage(self):
         return get_round_and_stage(self.dht)
