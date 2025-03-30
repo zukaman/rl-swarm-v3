@@ -57,7 +57,7 @@ if [ "$CONNECT_TO_TESTNET" = "True" ]; then
     done
     echo "userData.json found. Proceeding..."
 
-    ORG_ID=$(jq -r 'keys[0]' modal-login/temp-data/userData.json)
+    ORG_ID=$(awk 'BEGIN { FS = "\"" } !/^[ \t]*[{}]/ { print $(NF - 1); exit }' modal-login/temp-data/userData.json)
     echo "ORG_ID set to: $ORG_ID"
 
     # Function to clean up the server process
