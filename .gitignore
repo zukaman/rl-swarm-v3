@@ -6,4 +6,5 @@
 .next/
 temp-data/
 
+swarm.pem
 runs/

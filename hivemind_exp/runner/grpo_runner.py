@@ -69,9 +69,9 @@ class GRPORunner:
 
         return kwargs
 
-    def _set_animal_name(self, peer_id):
+    def _get_animal_name(self, peer_id):
         animal_name = get_name_from_peer_id(peer_id)
-        logger.info(f"🐱 Assigning [{animal_name}] to peer ID [{peer_id}]")
+        logger.info(f"🐱 Hello 🐈 [{animal_name}] 🦮 [{peer_id}]!")
         return animal_name
 
     def setup_dht(self, grpo_args):
@@ -83,7 +83,7 @@ class GRPORunner:
             first_visible = str(dht.get_visible_maddrs()[0])
             logger.info(f"🤖 Starting swarm at {first_visible}")
 
-        self.name = self._set_animal_name(str(dht.peer_id))
+        self.name = self._get_animal_name(str(dht.peer_id))
         return dht
 
     def run(

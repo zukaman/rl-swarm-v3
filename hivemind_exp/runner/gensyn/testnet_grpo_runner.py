@@ -42,7 +42,7 @@ class TestnetGRPORunner(GRPORunner):
         logger.info(f"🐝 Joining swarm with initial_peers = {initial_peers}")
 
         peer_id = str(dht.peer_id)
-        self.name = self._set_animal_name(peer_id)
+        self.name = self._get_animal_name(peer_id)
         self.register_peer(peer_id)
         return dht
 

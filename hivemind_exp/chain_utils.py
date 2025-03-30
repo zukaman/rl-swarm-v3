@@ -93,8 +93,9 @@ class ModalSwarmCoordinator(SwarmCoordinator):
             if e.response is None or e.response.status_code != 500:
                 raise
 
+            logger.info("Unknown error calling register-peer endpoint! Continuing.")
             # TODO: Verify actual contract errors.
-            logger.info(f"Peer ID [{peer_id}] is already registered! Continuing.")
+            # logger.info(f"Peer ID [{peer_id}] is already registered! Continuing.")
 
     def submit_winners(self, round_num, winners):
         try:
@@ -112,8 +113,9 @@ class ModalSwarmCoordinator(SwarmCoordinator):
             if e.response is None or e.response.status_code != 500:
                 raise
 
+            logger.info("Unknown error calling submit-winner endpoint! Continuing.")
             # TODO: Verify actual contract errors.
-            logger.info("Winners already submitted for this round! Continuing.")
+            # logger.info("Winners already submitted for this round! Continuing.")
 
 
 def send_via_api(org_id, method, args):
