@@ -1,9 +1,9 @@
 import { ParentProps } from "solid-js"
 import { SwarmContext, SwarmContextType } from "./SwarmContext"
-import { LeaderboardResponse, RewardsResponse, RewardsHistory } from "./swarm.api"
+import { LeaderboardResponse, RewardsResponse, RewardsHistory, GossipResponse } from "./swarm.api"
 
 export const defaultMockSwarmContext: SwarmContextType = {
-	gossipMessages: () => [],
+	gossipMessages: () => null,
 	leaders: () => null,
 	leadersLoading: () => false,
 	leadersError: () => null,
@@ -24,7 +24,7 @@ export const defaultMockSwarmContext: SwarmContextType = {
 
 interface MockSwarmProviderProps extends ParentProps {
 	values: {
-		gossipMessages?: () => { id: string; message: string; node: string }[]
+		gossipMessages?: () => GossipResponse | null | undefined
 		leaders?: () => LeaderboardResponse | null | undefined
 		leadersLoading?: () => boolean
 		leadersError?: () => Error | null

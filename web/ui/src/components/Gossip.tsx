@@ -1,10 +1,11 @@
-import { onMount, createEffect } from "solid-js"
+import { onMount, createEffect, Switch, Match } from "solid-js"
 import { useSwarm } from "../SwarmContext"
 import SectionHeader from "./SectionHeader"
 import LoadingSpinner from "./LoadingSpinner"
 
 export default function Gossip() {
 	const ctx = useSwarm()
+
 
 	let containerRef: HTMLDivElement | undefined
 
@@ -24,7 +25,7 @@ export default function Gossip() {
 
 	createEffect(() => {
 		// @ts-expect-error - Intentionally unused variable
-		const _ = ctx.gossipMessages()
+		const _ = ctx.gossipMessages()?.messages
 		scrollToBottom()
 	})
 
@@ -43,19 +44,22 @@ export default function Gossip() {
 
 			<div ref={containerRef} class="overflow-scroll overflow-x-hidden flex-grow min-h-0 max-h-[300px]" id="gossip-container">
 				<ul class="list-none">
-					{ctx.gossipMessages().length > 0 ? (
-						ctx.gossipMessages().map((msg) => {
-							return (
-								<li class="mt-4">
-									<NodeMessage id={msg.node} message={msg.message} />
-								</li>
-							)
-						})
-					) : (
-						<span>
-							<LoadingSpinner message="Fetching gossip..." />
-						</span>
-					)}
+					<Switch>
+						<Match when={ctx.gossipMessages()?.messages.length ?? 0 > 0}>
+							{ctx.gossipMessages()?.messages.map((msg) => {
+								return (
+									<li class="mt-4">
+										<NodeMessage id={msg.node} message={msg.message} />
+									</li>
+								)
+							})}
+						</Match>
+						<Match when={true}>
+							<span>
+								<LoadingSpinner message="Fetching gossip..." />
+							</span>
+						</Match>
+					</Switch>
 				</ul>
 			</div>
 		</section>
@@ -75,9 +79,9 @@ function NodeMessage(props: { id: string; message: string }) {
 }
 
 const processMessage = (message: string): { text: string; isHighlighted: boolean }[] => {
-	const reAnswer = new RegExp(/\.\.\.Answer:.+$/)
-	const reMajority = new RegExp(/\.\.\.Majority:.+$/)
-	const reIdentify = new RegExp(/\.\.\.Identify:.+$/)
+	const reAnswer = new RegExp(/\.\.\.Answer:.+$/g)
+	const reMajority = new RegExp(/\.\.\.Majority:.+$/g)
+	const reIdentify = new RegExp(/\.\.\.Identify:.+$/g)
 
 	// Replace each pattern with a bold version
 	// Split message into segments based on patterns

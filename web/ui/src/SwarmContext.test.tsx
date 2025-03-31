@@ -121,7 +121,7 @@ describe("SwarmProvider", () => {
 			const ctx = useSwarm()
 			return (
 				<div>
-					<div data-testid="gossip-count">{ctx.gossipMessages().length}</div>
+					<div data-testid="gossip-count">{ctx.gossipMessages()?.messages.length ?? 0}</div>
 					<div data-testid="current-round">{ctx.currentRound()}</div>
 				</div>
 			)

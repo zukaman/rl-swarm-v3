@@ -4,7 +4,7 @@ import api from "./swarm.api"
 
 export interface SwarmContextType {
 	// Gossip info
-	gossipMessages: () => { id: string; message: string; node: string }[]
+	gossipMessages: () => GossipResponse | null | undefined
 
 	// The data for the actual leaderboard + loading, error states.
 	leaders: () => LeaderboardResponse | null | undefined
@@ -50,7 +50,7 @@ export function useSwarm() {
 
 export function SwarmProvider(props: ParentProps) {
 	// Gossip state
-	const [gossipMessages, setGossipMessages] = createSignal<{ id: string; message: string; node: string }[]>([])
+	const [gossipMessages, setGossipMessages] = createSignal<GossipResponse | undefined | null>(null)
 	let seenMessageIds = new Set<string>()
 
 	// Round and stage state
@@ -143,17 +143,18 @@ export function SwarmProvider(props: ParentProps) {
 				return msg
 			})
 
-		setGossipMessages((prev) => {
-			const newMessages = [...prev, ...msgs].slice(-200)
-			return newMessages
-		})
+		const nextGossip = {
+			messages: [...(gossipMessages()?.messages ?? []), ...msgs].slice(-200)
+		}
+
+		setGossipMessages(nextGossip)
 
 		if (seenMessageIds.size > 2000) {
 			const temp = Array.from(seenMessageIds).slice(-2000)
 			seenMessageIds = new Set(temp)
 		}
 
-		return { ...data, messages: msgs }
+		return nextGossip
 	})
 
 	// @ts-expect-warning - Intentionally unused variable
