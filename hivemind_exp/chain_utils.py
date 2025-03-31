@@ -57,7 +57,7 @@ class WalletSwarmCoordinator(SwarmCoordinator):
 
     def _default_gas(self):
         return {
-            "gas": 500000,
+            "gas": 2000000,
             "gasPrice": self.web3.to_wei("1", "gwei"),
         }
 
