@@ -28,6 +28,10 @@ function RewardsTooltip() {
 				<li class="mb-2"><strong>Making good judgments</strong> &mdash; Correctly evaluating other agents' solutions</li>
 				<li><strong>Building consensus</strong> &mdash; Agreeing with the majority on the best solution</li>
 			</ul>
+
+			<p class="mt-4">
+				Training Rewards in the graph refresh periodically but are tracked cumulatively over time.
+			</p>
 		</div>
 	)
 }

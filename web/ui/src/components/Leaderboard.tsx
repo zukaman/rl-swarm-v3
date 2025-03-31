@@ -134,7 +134,7 @@ export default function Leaderboard() {
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-2">
 				<SectionHeader title="Leaderboard" tooltip={LeaderboardTooltip()} />
 
-				<div class="md:ml-2 relative">
+				<div class="relative">
 					<form onSubmit={searchLeaderboard} class="flex uppercase mt-2 mb-2 uppercase" inert={leaderSearchResult.loading}>
 						<input type="text" value={searchInput()} onInput={(e) => setSearchInput(e.currentTarget.value)} placeholder="ENTER YOUR NODE NAME" class="border border-gensyn-brown p-2 flex-grow focus:outline-none focus:ring-0 focus:border-gensyn-green" />
 						<button type="submit" class="uppercase border-t border-b border-r border-gensyn-brown p-2 bg-[rgba(0,0,0,0.05)]">

@@ -400,9 +400,14 @@ class SwarmApi implements ISwarmApi {
 				dhtParticipantsById.set(leader.id, leader)
 			})
 
-			const data = voterLeaderboard.leaders.map((leader) => {
+			const data = voterLeaderboard.leaders
+			.filter((leader) => {
 				const peerId = peerIdsByEoa[leader.id as `0x${string}`]
-				const nickname = peerIdsToNames[peerId] || leader.id
+				return peerId !== ""
+			})
+			.map((leader) => {
+				const peerId = peerIdsByEoa[leader.id as `0x${string}`]
+				const nickname = peerIdsToNames[peerId]
 				const cumulativeReward = Number(dhtParticipantsById.get(peerId)?.score.toFixed(2)) || 0
 
 				const out: Leader = {

@@ -63,21 +63,60 @@ export default function Gossip() {
 }
 
 function NodeMessage(props: { id: string; message: string }) {
-	const reAnswer = new RegExp(/Answer:.+$/)
-
-	const match = props.message.match(reAnswer)
-
-	let mainText = props.message
-	let answer = ""
-
-	if (match) {
-		mainText = mainText.slice(0, props.message.length - match[0].length)
-		answer = match[0]
-	}
-
+	const segments = processMessage(props.message)
 	return (
 		<p class="uppercase">
-			<span class="text-gensyn-green">[{props.id}]</span> {mainText} <strong>{answer}</strong>
+			<span class="text-gensyn-green">[{props.id}]</span>
+			{segments.map((segment) => (
+				<span class={segment.isHighlighted ? "font-bold" : ""}>{segment.text}</span>
+			))}
 		</p>
 	)
+}
+
+const processMessage = (message: string): { text: string; isHighlighted: boolean }[] => {
+	const reAnswer = new RegExp(/\.\.\.Answer:.+$/)
+	const reMajority = new RegExp(/\.\.\.Majority:.+$/)
+	const reIdentify = new RegExp(/\.\.\.Identify:.+$/)
+
+	// Replace each pattern with a bold version
+	// Split message into segments based on patterns
+	const segments = []
+	let lastIndex = 0
+	
+	// Find all matches and their positions
+	const matches = [
+		...message.matchAll(reAnswer),
+		...message.matchAll(reMajority), 
+		...message.matchAll(reIdentify)
+	].sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+
+	// Build segments array with type info
+	for (const match of matches) {
+		if (match.index !== undefined) {
+			// Add normal text before match
+			if (match.index > lastIndex) {
+				segments.push({
+					text: message.slice(lastIndex, match.index),
+					isHighlighted: false
+				})
+			}
+			// Add highlighted match
+			segments.push({
+				text: match[0],
+				isHighlighted: true
+			})
+			lastIndex = match.index + match[0].length
+		}
+	}
+
+	// Add remaining text
+	if (lastIndex < message.length) {
+		segments.push({
+			text: message.slice(lastIndex),
+			isHighlighted: false
+		})
+	}
+
+	return segments
 }
