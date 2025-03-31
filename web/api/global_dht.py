@@ -6,7 +6,7 @@ from . import server_cache
 # DHT singletons for the client
 # Initialized in main and used in the API handlers.
 dht: hivemind.DHT | None = None
-dht_cache = None
+dht_cache: server_cache.Cache | None = None
 
 def setup_global_dht(initial_peers, coordinator, logger):
     global dht

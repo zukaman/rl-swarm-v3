@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 import json
 
 from hivemind_exp.dht_utils import *
-from hivemind_exp.name_utils import get_name_from_peer_id
+from hivemind_exp.name_utils import *
 
 from . import global_dht
 
@@ -113,7 +113,7 @@ def get_leaderboard():
 
 
 @app.get("/api/rewards-history")
-def get_leaderboard():
+def get_rewards_history():
     leaderboard = global_dht.dht_cache.get_leaderboard()
     res = dict(leaderboard)
 
@@ -125,16 +125,12 @@ def get_leaderboard():
 
 @app.get("/api/name-to-id")
 def get_id_from_name(name: str = Query("")):
-	global dht_cache
-	assert dht_cache
-
 	leaderboard = global_dht.dht_cache.get_leaderboard()
 	leader_ids = [leader["id"] for leader in leaderboard["leaders"]] or []
 
-	uuid = search_peer_ids_for_name(leader_ids, name)
-
+	peer_id = search_peer_ids_for_name(leader_ids, name)
 	return {
-		"id": uuid,
+		"id": peer_id,
 	}
 
 @app.post("/api/id-to-name")
