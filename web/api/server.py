@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from threading import Thread
 
 import aiofiles
+from hivemind_exp.chain_utils import ModalSwarmCoordinator, setup_web3
 import httpx
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, Response, Query
@@ -260,15 +261,12 @@ def populate_cache():
 
 
 def main(args):
-    # Allows either an environment variable for peering or fallback to command line args.
-    initial_peers_env = os.getenv("INITIAL_PEERS", "")
-    initial_peers_list = (
-        initial_peers_env.split(",") if initial_peers_env else args.initial_peers
-    )
+    coordinator = ModalSwarmCoordinator("", web3=setup_web3()) # Only allows contract calls
+    initial_peers = coordinator.get_bootnodes()
 
     # Supplied with the bootstrap node, the client will have access to the DHT.
-    logger.info(f"initializing DHT with peers {initial_peers_list}")
-    global_dht.setup_global_dht(initial_peers_list, logger)
+    logger.info(f"initializing DHT with peers {initial_peers}")
+    global_dht.setup_global_dht(initial_peers, coordinator, logger)
 
     thread = Thread(target=populate_cache)
     thread.daemon = True

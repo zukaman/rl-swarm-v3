@@ -26,6 +26,7 @@ COPY ./web/api ./api
 
 # Copies only the needed files from hivemind for the server to run.
 COPY ./hivemind_exp/*_utils.py ./hivemind_exp/__init__.py ./hivemind_exp/
+COPY ./hivemind_exp/contracts/*.json ./hivemind_exp/contracts/
 
 FROM node:22 AS frontend
 

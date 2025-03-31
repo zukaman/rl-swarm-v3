@@ -8,8 +8,8 @@ from . import server_cache
 dht: hivemind.DHT | None = None
 dht_cache = None
 
-def setup_global_dht(initial_peers, logger):
+def setup_global_dht(initial_peers, coordinator, logger):
     global dht
     global dht_cache
     dht = hivemind.DHT(start=True, initial_peers=initial_peers)
-    dht_cache = server_cache.Cache(dht, multiprocessing.Manager(), logger)
+    dht_cache = server_cache.Cache(dht, coordinator, multiprocessing.Manager(), logger)

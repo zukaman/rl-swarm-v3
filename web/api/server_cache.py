@@ -2,15 +2,18 @@ import hashlib
 import itertools
 from datetime import datetime
 
+from .gossip_utils import *
+
 from hivemind_exp.dht_utils import *
-from . import gossip_utils
 from hivemind_exp.name_utils import get_name_from_peer_id
 from .gossip_utils import stage1_message, stage2_message, stage3_message
 
 
 class Cache:
-    def __init__(self, dht, manager, logger):
+    def __init__(self, dht, coordinator, manager, logger):
         self.dht = dht
+        self.coordinator = coordinator
+
         self.manager = manager
         self.logger = logger
 
@@ -51,11 +54,11 @@ class Cache:
             self.logger.error("cache failed to poll dht: %s", e)
 
     def _get_dht_value(self, **kwargs):
-        return get_dht_value(self.dht, beam_size=100, **kwargs)
+        return get_dht_value(self.dht, beam_size=60, **kwargs)
 
     def _get_round_and_stage(self):
         try:
-            r, s = get_round_and_stage(self.dht)
+            r, s = self.coordinator.get_round_and_stage()
             self.logger.info(f"cache polled round and stage: r={r}, s={s}")
             with self.lock:
                 self.current_round.value = r
@@ -120,13 +123,14 @@ class Cache:
         start_time = datetime.now()
         try:
             # Basically a proxy for the reachable peer group.
-            curr_rewards: dict[str, Any] | None = self._get_dht_value(
+            curr_rewards = self._get_dht_value(
                 key=rewards_key(self.current_round.value, self.current_stage.value)
             )
             if not curr_rewards:
                 raise ValueError("missing curr_rewards")
 
             nodes = curr_rewards.keys()
+
             curr_round = self.current_round.value
             curr_stage = self.current_stage.value
             start_round = (
@@ -168,7 +172,7 @@ class Cache:
                                 {
                                     "id": gossip_id,
                                     "message": message,
-                                    "node": node_key,
+                                    "node": get_name_from_peer_id(node_key),
                                 },
                             )
                         )
