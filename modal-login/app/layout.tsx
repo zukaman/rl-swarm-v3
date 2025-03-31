@@ -9,8 +9,8 @@ import { Providers } from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Account Kit Quickstart",
-  description: "Account Kit Quickstart NextJS Template",
+  title: "Sign in to Gensyn Testnet",
+  description: "Modal sign in for Gensyn Testnet",
 };
 
 export default function RootLayout({

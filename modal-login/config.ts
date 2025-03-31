@@ -6,6 +6,7 @@ import {
 import { alchemy, sepolia } from "@account-kit/infra";
 import { QueryClient } from "@tanstack/react-query";
 
+
 const uiConfig: AlchemyAccountsUIConfig = {
   illustrationStyle: "outline",
   auth: {
@@ -18,6 +19,7 @@ const uiConfig: AlchemyAccountsUIConfig = {
       ],
     ],
     addPasskeyOnSignup: false,
+    //header: <img src="logo.png"/>,
   },
 };
 

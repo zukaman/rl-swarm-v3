@@ -17,8 +17,6 @@ export default function Home() {
 
   const [createdApiKey, setCreatedApiKey] = useState(false);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   useEffect(() => {
     // User logged out, so reset the state.
     if (!user && createdApiKey) {
@@ -65,71 +63,27 @@ export default function Home() {
   }, [createdApiKey, signer, signerStatus.isConnected, user]);
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-24 gap-4 justify-center text-center">
+    <main className="flex min-h-screen flex-col items-center gap-4 justify-center text-center">
       {signerStatus.isInitializing ? (
         <>Loading...</>
       ) : user ? (
+        <div className="card">
         <div className="flex flex-col gap-2 p-2">
-          <p className="text-xl font-bold">Success!</p>
-          <p>Logged in as {user.email ?? "anon"}.</p>
-          <p>{user.address}</p>
-
-          <button
-            className="btn btn-primary mt-6 disabled:opacity-70"
-            disabled={!createdApiKey || isSubmitting}
-            onClick={async () => {
-              const peerId = window.prompt("Enter peer id");
-              if (!peerId) {
-                return;
-              }
-              setIsSubmitting(true);
-              try {
-                const resp = await fetch("/api/register-peer", {
-                  method: "POST",
-                  body: JSON.stringify({ orgId: user.orgId, peerId }),
-                });
-                const respJson = await resp.json();
-                console.log(respJson);
-                window.alert(JSON.stringify(respJson, null, 2));
-              } catch (err) {
-                console.error(err);
-                window.alert(err);
-              }
-              setIsSubmitting(false);
-            }}
-          >
-            Register Peer
-          </button>
-          <button
-            className="btn btn-primary mt-6 disabled:opacity-70"
-            disabled={!createdApiKey || isSubmitting}
-            onClick={async () => {
-              setIsSubmitting(true);
-              try {
-                const resp = await fetch("/api/submit-winner", {
-                  method: "POST",
-                  body: JSON.stringify({ orgId: user.orgId }),
-                });
-                const respJson = await resp.json();
-                console.log(respJson);
-                window.alert(JSON.stringify(respJson, null, 2));
-              } catch (err) {
-                console.error(err);
-                window.alert(err);
-              }
-              setIsSubmitting(false);
-            }}
-          >
-            Submit winner
-          </button>
+          <p className="text-xl font-bold">YOU ARE SUCCESSFULLY LOGGED IN TO THE GENSYN TESTNET</p>
           <button className="btn btn-primary mt-6" onClick={() => logout()}>
             Log out
           </button>
         </div>
+        </div>
       ) : (
-        <button className="btn btn-primary" onClick={openAuthModal}>
+        <div className="card">
+        <p className="text-xl font-bold">LOGIN TO THE GENSYN TESTNET</p>
+        <div className="flex flex-col gap-2 p-2">
+          <button className="btn btn-primary mt-6" onClick={openAuthModal}>
           Login
-        </button>
+          </button>
+        </div>
+        </div>
       )}
     </main>
   );
