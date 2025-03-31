@@ -1,7 +1,6 @@
 import hashlib
 import itertools
 from datetime import datetime
-from typing import Sequence
 
 from .gossip_utils import *
 
@@ -54,8 +53,8 @@ class Cache:
         except Exception as e:
             self.logger.error("cache failed to poll dht: %s", e)
 
-    def _get_dht_value(self, **kwargs):
-        return get_dht_value(self.dht, beam_size=100, **kwargs)
+    def _get_dht_value(self, beam_size=100, **kwargs):
+        return get_dht_value(self.dht, beam_size=beam_size, **kwargs)
 
     def _get_round_and_stage(self):
         try:
@@ -78,17 +77,22 @@ class Cache:
 
         return max(0, r), max(0, s)
 
+    def _current_rewards(self) -> dict[str, Any] | None:
+        # Basically a proxy for the reachable peer group.
+        curr_round = self.current_round.value
+        curr_stage = self.current_stage.value
+        return self._get_dht_value(key=rewards_key(curr_round, curr_stage), latest=True)
+
     def _get_leaderboard(self):
         try:
-            curr_round = self.current_round.value
-            curr_stage = self.current_stage.value
-
-            raw = self._get_dht_value(
-                key=leaderboard_key(
-                    *self._last_round_and_stage(curr_round, curr_stage)
-                ),
-                latest=True,
-            )
+            rewards = self._current_rewards()
+            if rewards:
+                # Sorted list of (node_key, reward) pairs.
+                raw = list(
+                    sorted(rewards.items(), key=lambda t: (t[1], t[0]), reverse=True)
+                )
+            else:
+                raw = []
 
             # Create entries for all participants
             all_entries = [
@@ -98,7 +102,7 @@ class Cache:
                     "score": t[1],
                     "values": [],
                 }
-                for t in (raw or [])
+                for t in raw
             ]
             self.logger.info(">>> lb_entries length: %d", len(all_entries))
 
@@ -134,7 +138,7 @@ class Cache:
             with self.lock:
                 self.leaderboard = {
                     "leaders": all_entries,
-                    "total": len(raw) if raw else 0,
+                    "total": len(raw),
                     "rewardsHistory": current_history,
                 }
         except Exception as e:
@@ -147,19 +151,13 @@ class Cache:
         round_gossip = []
         start_time = datetime.now()
         try:
-            # Basically a proxy for the reachable peer group.
-
             curr_round = self.current_round.value
             curr_stage = self.current_stage.value
+            curr_rewards = self._current_rewards()
+            if not curr_rewards:
+                raise ValueError("missing curr_rewards")
 
-            prev_rewards = self._get_dht_value(
-                key=rewards_key(*self._last_round_and_stage(curr_round, curr_stage)),
-                latest=True,
-            )
-            if not prev_rewards:
-                raise ValueError("missing prev_rewards")
-
-            nodes: Sequence[str] = prev_rewards.keys()
+            nodes = curr_rewards.keys()
             start_round = max(0, curr_round - 3)
             for round_num, stage, node_key in itertools.product(
                 range(start_round, curr_round + 1),
