@@ -44,7 +44,7 @@ if [ "$CONNECT_TO_TESTNET" = "True" ]; then
     cd modal-login
     yarn install
     yarn dev > /dev/null 2>&1 & # Run in background and suppress output
-    #yarn dev &
+
     SERVER_PID=$!  # Store the process ID
     sleep 5
     open http://localhost:3000
@@ -73,8 +73,8 @@ if [ "$CONNECT_TO_TESTNET" = "True" ]; then
 fi
 #lets go!
 echo "Getting requirements..."
-pip install -r "$ROOT"/requirements-hivemind.txt
-pip install -r "$ROOT"/requirements.txt
+pip install -r "$ROOT"/requirements-hivemind.txt > /dev/null
+pip install -r "$ROOT"/requirements.txt > /dev/null
 
 if ! which nvidia-smi; then
    #You don't have a NVIDIA GPU
@@ -84,7 +84,7 @@ elif [ -n "$CPU_ONLY" ]; then
    CONFIG_PATH="$ROOT/hivemind_exp/configs/mac/grpo-qwen-2.5-0.5b-deepseek-r1.yaml"
 else
    #NVIDIA GPU found
-   pip install -r "$ROOT"/requirements_gpu.txt
+   pip install -r "$ROOT"/requirements_gpu.txt > /dev/null
    CONFIG_PATH="$ROOT/hivemind_exp/configs/gpu/grpo-qwen-2.5-0.5b-deepseek-r1.yaml"
 fi
 

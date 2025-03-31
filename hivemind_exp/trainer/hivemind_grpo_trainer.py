@@ -242,10 +242,13 @@ class HivemindGRPOTrainer:
 
         self.logger.info("Training timed out!")
 
-    def follower_train(self, check_interval: float = 5, log_timeout: float = 10):
+    def follower_train(
+        self, check_interval=5.0, log_timeout=10.0, max_check_interval=60.0 * 5
+    ):
         done_rounds = set()
         start_time = time.monotonic()
-        fetch_log_time, finish_log_time = start_time, start_time
+        fetch_log_time = start_time
+        check_backoff = check_interval  # Exponential backoff for already finished rounds.
         while time.monotonic() - start_time < self.stage_data.train_timeout:
             curr_time = time.monotonic()
             _ = self.dht.get_visible_maddrs(latest=True)
@@ -255,7 +258,9 @@ class HivemindGRPOTrainer:
                 round_num, stage = self.get_round_and_stage()
             except Exception as e:
                 if curr_time - fetch_log_time > log_timeout:
-                    self.logger.debug(f"Could not fetch round and stage: {e}")
+                    self.logger.debug(
+                        f"Could not fetch round and stage: {e}. Next check in {check_interval}s."
+                    )
                     fetch_log_time = curr_time
 
                 time.sleep(check_interval)
@@ -277,10 +282,13 @@ class HivemindGRPOTrainer:
                         raise
 
                 done_rounds.add(round_num)
+                check_backoff = check_interval  # Reset backoff after successful round
             else:
-                if curr_time - finish_log_time > log_timeout:
-                    self.logger.info(f"Already finished round: {round_num}. Skipping.")
-                    finish_log_time = curr_time
+                self.logger.info(
+                    f"Already finished round: {round_num}. Next check in {check_backoff}s."
+                )
+                time.sleep(check_backoff)
+                check_backoff = min(check_backoff * 2, max_check_interval)
 
             if round_num == self.stage_data.max_rounds - 1:
                 return
