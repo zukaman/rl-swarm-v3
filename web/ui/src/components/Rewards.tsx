@@ -28,7 +28,6 @@ function RewardsTooltip() {
 				<li class="mb-2"><strong>Making good judgments</strong> &mdash; Correctly evaluating other agents' solutions</li>
 				<li><strong>Building consensus</strong> &mdash; Agreeing with the majority on the best solution</li>
 			</ul>
-			<p class="mt-4">The leaderboard shows cumulative training rewards, while the graph shows rewards since you loaded the page.</p>
 		</div>
 	)
 }
@@ -71,8 +70,8 @@ function RewardsGraph(props: { data: { leaders: { id: string; values: { x: numbe
 		const yScale = d3.scaleLinear().domain([0, 0]).range([height, 0])
 
 		// Set scales based on data.
-		const allXs = chartData().leaders.flatMap((leader) => leader.values.map((d) => d.x))
-		const allYs = chartData().leaders.flatMap((leader) => leader.values.map((d) => d.y))
+		const allXs = chartData().leaders.slice(0, 10).flatMap((leader) => leader.values.map((d) => d.x))
+		const allYs = chartData().leaders.slice(0, 10).flatMap((leader) => leader.values.map((d) => d.y))
 
 		yScale.domain([d3.min(allYs)!, d3.max(allYs)!])
 		xScale.domain([d3.min(allXs)!, d3.max(allXs)!])
@@ -127,7 +126,7 @@ function RewardsGraph(props: { data: { leaders: { id: string; values: { x: numbe
 
 		// Draw data.
 		svg.selectAll(".line")
-			.data(chartData().leaders)
+			.data(chartData().leaders.slice(0, 10))
 			.enter()
 			.append("path")
 			.attr("class", "line")

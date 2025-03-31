@@ -57,8 +57,8 @@ export default function Swarm() {
 									</a>
 								</li>
 								<li>
-									<a class="underline" href="">
-										Testnet Blog
+									<a class="underline" href="https://gensyn.ai/testnet" target="_blank" rel="noopener noreferrer">
+										Testnet
 									</a>
 								</li>
 							</ul>
