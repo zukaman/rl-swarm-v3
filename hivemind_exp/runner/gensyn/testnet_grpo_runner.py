@@ -35,8 +35,6 @@ class TestnetGRPORunner(GRPORunner):
 
     def setup_dht(self, grpo_args):
         initial_peers = grpo_args.initial_peers
-        if not initial_peers:
-            logger.info("Cannot locate on-chain initial peers; running alone.")
 
         dht = hivemind.DHT(start=True, **self._dht_kwargs(grpo_args))
         logger.info(f"🐝 Joining swarm with initial_peers = {initial_peers}")
@@ -53,8 +51,14 @@ class TestnetGRPORunner(GRPORunner):
         training_args: GRPOConfig,
         initial_datasets_fn: Callable[[], Tuple[Dataset, Dataset]],
     ):
-        initial_peers = self.get_initial_peers()
-        logger.info(f"Retrieved initial peers from chain: {initial_peers}")
+        initial_peers = grpo_args.initial_peers
+        if not initial_peers:
+            initial_peers = self.get_initial_peers()
+            logger.info(f"Retrieved initial peers from chain: {initial_peers}")
+        elif initial_peers == ["BOOT"]:
+            initial_peers = []
+            logger.info("Proceeding as bootnode!")
+
         grpo_args.initial_peers = initial_peers
         super().run(
             model_args,
