@@ -11,7 +11,7 @@ class TestnetGRPOTrainer(HivemindGRPOTrainer):
 
     def submit_winners(self, round_num: int, winners: Sequence[str]):
         self.logger.info(f"🏆 Submitting winners for round {round_num}: {winners}")
-        self.coordinator.submit_winners(round_num, winners)
+        self.coordinator.submit_winners(round_num, winners[:1])
 
     def get_round_and_stage(self):
         return self.coordinator.get_round_and_stage()
