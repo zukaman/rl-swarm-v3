@@ -78,8 +78,10 @@ class Cache:
 
     def _previous_round_and_stage(self):
         r = self.current_round.value
-        s = self.current_stage.value - 1
-        if s == -1:
+        s = self.current_stage.value
+
+        s -= 1
+        if s < 0:
             s = 2
             r -= 1
 
@@ -144,7 +146,7 @@ class Cache:
                             entry["scoreHistory"] = (entry["scoreHistory"] + [{"x": current_time, "y": entry["cumulativeScore"]}])[-30:]
 
                 # Remove entries that are not in the current or previous round/stage.
-                prev_round, prev_stage = self._last_round_and_stage(curr_round, curr_stage)
+                prev_round, prev_stage = self._previous_round_and_stage()
                 current_entries = {}
                 for peer_id, entry in existing_entries.items():
                     in_current = (entry["recordedRound"] == curr_round and entry["recordedStage"] == curr_stage)
