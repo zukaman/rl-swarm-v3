@@ -1,6 +1,7 @@
 import gc
 import logging
 import time
+import traceback
 from typing import Any
 
 import datasets
@@ -9,6 +10,7 @@ from hivemind.dht import DHT
 from hivemind.utils import get_dht_time
 from trl import GRPOConfig, GRPOTrainer
 
+from hivemind_exp.debug_utils import print_system_info
 from hivemind_exp.dht_utils import (
     ROUND_STAGE_NUMBER_KEY,
     get_dht_value,
@@ -248,7 +250,9 @@ class HivemindGRPOTrainer:
         done_rounds = set()
         start_time = time.monotonic()
         fetch_log_time = start_time
-        check_backoff = check_interval  # Exponential backoff for already finished rounds.
+        check_backoff = (
+            check_interval  # Exponential backoff for already finished rounds.
+        )
         while time.monotonic() - start_time < self.stage_data.train_timeout:
             curr_time = time.monotonic()
             _ = self.dht.get_visible_maddrs(latest=True)
@@ -295,14 +299,18 @@ class HivemindGRPOTrainer:
 
         self.logger.info("Training timed out!")
 
+    def _train(self):
+        if self.node.is_coordinator:
+            self.coordinator_train()
+        else:
+            self.follower_train()
+
     def train(self):
         try:
-            if self.node.is_coordinator:
-                self.coordinator_train()
-            else:
-                self.follower_train()
+            self._train()
 
         except Exception:
-            import traceback
-
+            self.logger.error("Encountered error during training!")
+            print_system_info()
             traceback.print_exc()
+            raise

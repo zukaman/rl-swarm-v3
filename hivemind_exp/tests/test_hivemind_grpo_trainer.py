@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import hivemind
+import pytest
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import GRPOConfig
 
@@ -62,10 +63,38 @@ def create_dht_and_trainer(tmp_path, node, stage_data, max_steps=1, initial_peer
     return dht, trainer
 
 
+
+
 ###############
 # SINGLE NODE #
 ###############
 
+def test_single_node_crash(tmp_path):
+    node = HivemindNode.coordinator("test", CK)
+
+    def reward_func(**kwargs):
+        return []
+
+    def error_fn (r, s):
+        raise ValueError("error")
+
+    _, trainer = create_dht_and_trainer(
+        tmp_path,
+        node,
+        StageData(
+            max_rounds=1,
+            round_winner_fn=lambda:[CK],
+            stages=[
+                SingleStageData(
+                    name="0",
+                    reward_funcs=[reward_func],
+                    datasets_fn= error_fn,
+                ),
+            ],
+        ),
+    )
+    with pytest.raises(ValueError, match='error'):
+        trainer.train()
 
 def test_single_node_single_stage(tmp_path):
     node = HivemindNode.coordinator("test", CK)

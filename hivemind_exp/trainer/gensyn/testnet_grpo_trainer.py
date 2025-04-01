@@ -20,11 +20,5 @@ class TestnetGRPOTrainer(HivemindGRPOTrainer):
         super().train_stages(round_num, start_stage, is_coordinator)
         self.submit_winners(round_num, self.stage_data.round_winner_fn())
 
-    def train(self):
-        try:
-            self.follower_train()
-
-        except Exception:
-            import traceback
-
-            traceback.print_exc()
+    def _train(self):
+        self.follower_train()
