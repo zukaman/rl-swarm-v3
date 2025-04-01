@@ -2,7 +2,7 @@ import { render, waitFor, fireEvent } from "@solidjs/testing-library"
 import Leaderboard from "./Leaderboard"
 import { vi, afterEach, beforeEach, describe, expect, it } from "vitest"
 import { MockSwarmProvider } from "../test-utils"
-import { LeaderboardResponse } from "../swarm.api"
+import { LeaderboardData } from "../SwarmContext"
 
 vi.mock("../swarm.api", () => ({
 	default: {
@@ -11,12 +11,12 @@ vi.mock("../swarm.api", () => ({
 }))
 
 describe("Leaderboard", () => {
-	const mockLeaders: LeaderboardResponse = {
+	const mockLeaders: LeaderboardData = {
 		leaders: [
-			{ id: "node1", values: [{ x: 0, y: 1 }], score: 1, nickname: "nn1", participation: 10 },
-			{ id: "node2", values: [{ x: 0, y: 2 }], score: 2, nickname: "nn2", participation: 20 },
+			{ id: "node1", cumulativeReward: 1, lastScore: 1, nickname: "nn1", participation: 10 },
+			{ id: "node2", cumulativeReward: 2, lastScore: 2, nickname: "nn2", participation: 20 },
 		],
-		total: 2,
+		totalPeers: 2,
 	}
 
 	beforeEach(() => {
@@ -31,7 +31,7 @@ describe("Leaderboard", () => {
 		const result = render(() => (
 			<MockSwarmProvider
 				values={{
-					leaders: () => ({ leaders: [], total: 0 }),
+					leaders: () => ({ leaders: [], totalPeers: 0 }),
 					leadersLoading: () => true,
 					nodesConnected: () => -1,
 					uniqueVoters: () => -1,
@@ -97,13 +97,13 @@ describe("Leaderboard", () => {
 		it("should handle finding a leader in the top 10", async () => {
 			const mockTopLeaders = {
 				leaders: [
-					{ id: "node1", values: [{ x: 0, y: 1 }], score: 1, nickname: "alpha", participation: 10 },
-					{ id: "node2", values: [{ x: 0, y: 2 }], score: 2, nickname: "beta", participation: 20 },
-					{ id: "node3", values: [{ x: 0, y: 3 }], score: 3, nickname: "gamma", participation: 30 },
-					{ id: "node4", values: [{ x: 0, y: 4 }], score: 4, nickname: "delta", participation: 40 },
-					{ id: "node5", values: [{ x: 0, y: 5 }], score: 5, nickname: "epsilon", participation: 50 },
+					{ id: "node1", nickname: "alpha", participation: 10, cumulativeReward: 1, lastScore: 1 },
+					{ id: "node2", nickname: "beta", participation: 20, cumulativeReward: 2, lastScore: 2 },
+					{ id: "node3", nickname: "gamma", participation: 30, cumulativeReward: 3, lastScore: 3 },
+					{ id: "node4", nickname: "delta", participation: 40, cumulativeReward: 4, lastScore: 4 },
+					{ id: "node5", nickname: "epsilon", participation: 50, cumulativeReward: 5, lastScore: 5 },
 				],
-				total: 5,
+				totalPeers: 5,
 			}
 
 			const result = render(() => (
@@ -135,12 +135,12 @@ describe("Leaderboard", () => {
 			const mockLeaders = {
 				leaders: Array.from({ length: 11 }, (_, i) => ({
 					id: `node${i + 1}`,
-					values: [{ x: 0, y: i + 1 }],
-					score: i + 1,
 					nickname: `node${i + 1}`,
-					participation: (i + 1) * 10
+					participation: (i + 1) * 10,
+					cumulativeReward: i + 1,
+					lastScore: i + 1,
 				})),
-				total: 11,
+				totalPeers: 11,
 			}
 
 			const result = render(() => (
@@ -148,7 +148,7 @@ describe("Leaderboard", () => {
 					values={{
 						leaders: () => mockLeaders,
 						nodesConnected: () => 11,
-						uniqueVoters: () => 11
+						uniqueVoters: () => 11,
 					}}
 				>
 					<Leaderboard />

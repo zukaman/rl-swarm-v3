@@ -41,6 +41,40 @@ const anvilChain: Chain = {
 	testnet: true,
 }
 
+// allLeaderDataResponseSchema is used to get all the leader data for the current and previous round/stage.
+// cumulativeScore is the cumulative reward for the leader since time of joining.
+// lastScore is the current reward for the leader in the current round/stage.
+const allRewardsStateResponseSchema = z.object({
+	leaders: z.array(
+		z.object({
+			id: z.string(), // Peer ID
+			nickname: z.string(), // Peer nickname (e.g., peaceful hairy dog)
+			recordedRound: z.number(), // Last round recorded for the peer
+			recordedStage: z.number(), // Last stage recorded for the peer
+			cumulativeScore: z.number(), // Cumulative reward for the peer since time of joining (inter-stage rewards)
+			lastScore: z.number(), // Current reward for the peer in the current round/stage (intra-stage rewards)
+			scoreHistory: z.array(z.object({ x: z.number(), y: z.number() })), // History cumulative rewards for the peer
+		}),
+	),
+	total: z.number(), // Total number of peers (not just in the leaderboard)
+})
+type AllRewardsStateResponse = z.infer<typeof allRewardsStateResponseSchema>
+
+export type AllLeaderDataResponse = {
+	leaders: Array<{
+		id: string
+		nickname: string
+		participation: number
+		cumulativeReward: number
+		lastScore: number
+	}>
+	rewards: Array<{
+		id: string
+		values: Array<{ x: number; y: number }>
+	}>
+	totalPeers: number
+}
+
 const rewardsResponseSchema = z.object({
 	leaders: z.array(
 		z.object({
@@ -286,6 +320,7 @@ interface ISwarmApi {
 	getRoundAndStage(): Promise<RoundAndStageResponse>
 	getLeaderboard(): Promise<LeaderboardResponse>
 	getGossip(req: GossipRequest): Promise<GossipResponse>
+	getLeaderboardCumulative(): Promise<AllLeaderDataResponse>
 }
 
 class SwarmApi implements ISwarmApi {
@@ -294,6 +329,8 @@ class SwarmApi implements ISwarmApi {
 	constructor(options: SwarmApiConfig) {
 		this.swarmContract = new SwarmContract(options.providerUrl, options.contractAddress, options.environment)
 	}
+
+	public async getAllLeaderData() {}
 
 	public async getRoundAndStage(): Promise<RoundAndStageResponse> {
 		try {
@@ -350,10 +387,12 @@ class SwarmApi implements ISwarmApi {
 
 	public async getRewardsHistory(): Promise<RewardsHistory> {
 		const rewardsHistorySchema = z.object({
-			leaders: z.array(z.object({
-				id: z.string(),
-				values: z.array(z.object({ x: z.number(), y: z.number() })),
-			})),
+			leaders: z.array(
+				z.object({
+					id: z.string(),
+					values: z.array(z.object({ x: z.number(), y: z.number() })),
+				}),
+			),
 		})
 
 		try {
@@ -381,6 +420,90 @@ class SwarmApi implements ISwarmApi {
 		}
 	}
 
+	/**
+	 * getLeaderboardCumulative returns the monolithic view of all the leaderboard/rewards data.
+	 * @returns
+	 */
+	public async getLeaderboardCumulative(): Promise<AllLeaderDataResponse> {
+		try {
+			// The smart contract has EOAs for the top participants.
+			// Given the EOA, we then need to get the peer ID.
+			const voterLeaderboard = await this.swarmContract.getLeaderboard()
+			const peerIdsByEoa = await this.swarmContract.getPeerIds(voterLeaderboard.leaders.map((leader) => leader.id as `0x${string}`))
+
+			// With the eoa->id mapping, we now make an id->name mapping.
+			const peerIdsToNames = await this.mapIdsToNames(Object.values(peerIdsByEoa))
+
+			// Get the cumulative rewards for each participant.
+			// This response will map the peer ID to cumulative and current reward.
+			const leaderboardCumulative = await fetch("/api/leaderboard-cumulative")
+			if (!leaderboardCumulative.ok) {
+				throw new Error(`Failed to fetch leaderboard cumulative: ${leaderboardCumulative.statusText}`)
+			}
+
+			const json = await leaderboardCumulative.json()
+			const result = allRewardsStateResponseSchema.parse(json)
+
+			// Transform API data to a map for lookup.
+			// For the leaderboard we need the DHT to get the cumulative reward for the leader.
+			const dhtParticipantsById = new Map<string, AllRewardsStateResponse["leaders"][number]>()
+			result.leaders.forEach((leader) => {
+				dhtParticipantsById.set(leader.id, leader)
+			})
+
+			// Leaderboard view.
+			const leaderboardEntries = voterLeaderboard.leaders
+				.filter((leader) => {
+					// An EOA mapping to an empty peer ID means the peer never finished registering.
+					const peerId = peerIdsByEoa[leader.id as `0x${string}`]
+					return peerId !== ""
+				})
+				.map((leader) => {
+					const peerId = peerIdsByEoa[leader.id as `0x${string}`]
+					const nickname = peerIdsToNames[peerId]
+					const cumulativeReward = dhtParticipantsById.get(peerId)?.cumulativeScore || 0
+
+					return {
+						id: leader.id,
+						nickname: nickname,
+						participation: leader.score,
+						cumulativeReward: parseFloat(cumulativeReward.toFixed(2)),
+						lastScore: parseFloat(leader.score.toFixed(2)),
+					}
+				})
+
+			// Rewards view.
+			// The rewards data is more about what's happening right now in the DHT than the leaderboard,
+			// so it's okay to just iterate over all entries in the DHT response.
+			const rewardEntries = result.leaders.map((leader) => {
+				return {
+					id: leader.id,
+					values: leader.scoreHistory,
+				}
+			})
+
+			return {
+				leaders: leaderboardEntries,
+				rewards: rewardEntries,
+				totalPeers: rewardEntries.length,
+			}
+		} catch (e) {
+			if (e instanceof z.ZodError) {
+				console.warn("zod error fetching leaderboard cumulative. returning empty leaderboard response.", e)
+				return {
+					leaders: [],
+					rewards: [],
+					totalPeers: 0,
+				}
+			} else if (e instanceof Error) {
+				console.error("error fetching leaderboard cumulative", e)
+				throw new Error(`could not get leaderboard cumulative: ${e.message}`)
+			} else {
+				throw new Error("could not get leaderboard cumulative")
+			}
+		}
+	}
+
 	public async getLeaderboard(): Promise<LeaderboardResponse> {
 		try {
 			// Leaderboard contains the information for the EOAs, which we can use to get the peer IDs.
@@ -401,25 +524,25 @@ class SwarmApi implements ISwarmApi {
 			})
 
 			const data = voterLeaderboard.leaders
-			.filter((leader) => {
-				const peerId = peerIdsByEoa[leader.id as `0x${string}`]
-				return peerId !== ""
-			})
-			.map((leader) => {
-				const peerId = peerIdsByEoa[leader.id as `0x${string}`]
-				const nickname = peerIdsToNames[peerId]
-				const cumulativeReward = Number(dhtParticipantsById.get(peerId)?.score.toFixed(2)) || 0
+				.filter((leader) => {
+					const peerId = peerIdsByEoa[leader.id as `0x${string}`]
+					return peerId !== ""
+				})
+				.map((leader) => {
+					const peerId = peerIdsByEoa[leader.id as `0x${string}`]
+					const nickname = peerIdsToNames[peerId]
+					const cumulativeReward = Number(dhtParticipantsById.get(peerId)?.score.toFixed(2)) || 0
 
-				const out: Leader = {
-					id: leader.id, // EOA
-					participation: leader.score, // Participation score
-					values: [], // Unused here
-					nickname: nickname,
-					score: cumulativeReward,
-				}
+					const out: Leader = {
+						id: leader.id, // EOA
+						participation: leader.score, // Participation score
+						values: [], // Unused here
+						nickname: nickname,
+						score: cumulativeReward,
+					}
 
-				return out
-			})
+					return out
+				})
 
 			return {
 				leaders: data,

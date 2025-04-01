@@ -1,9 +1,8 @@
-import { useSwarm } from "../SwarmContext"
+import { LeaderboardData, useSwarm } from "../SwarmContext"
 import LoadingSpinner from "./LoadingSpinner"
 import ErrorMessage from "./ErrorMessage"
 import SectionHeader from "./SectionHeader"
 import { createResource, createSignal, Show, Switch, Match } from "solid-js"
-import swarmApi, { LeaderboardResponse } from "../swarm.api"
 
 export default function Leaderboard() {
 	const { leaders, leadersLoading, leadersError, nodesConnected, uniqueVoters, uniqueVotersLoading } = useSwarm()
@@ -16,7 +15,7 @@ export default function Leaderboard() {
 
 	type SearchResult = {
 		index: number
-		leader: LeaderboardResponse["leaders"][number]
+		leader: LeaderboardData["leaders"][number]
 		inLeaderboard: boolean
 	}
 
@@ -46,16 +45,7 @@ export default function Leaderboard() {
 				} as SearchResult
 			}
 
-			const leader = await swarmApi.getPeerInfoFromName(query)
-			if (!leader) {
-				throw new Error(`could not find peer ${query}`)
-			}
-
-			return {
-				index: -1,
-				leader: leader,
-				inLeaderboard: false,
-			} as SearchResult
+			throw new Error(`could not find peer ${query} in top 100 of leaderboard`)
 		},
 	)
 
@@ -72,7 +62,7 @@ export default function Leaderboard() {
 	 * @param leader - The leader to check.
 	 * @returns True if the leader is the searched leader, false otherwise.
 	 */
-	const isSearchedLeader = (target: LeaderboardResponse["leaders"][number]) => {
+	const isSearchedLeader = (target: LeaderboardData["leaders"][number]) => {
 		if (!leaderSearchResult()) {
 			return false
 		}
@@ -99,11 +89,7 @@ export default function Leaderboard() {
 	const LeaderboardTooltip = () => {
 		return (
 			<div class="uppercase">
-				<p class="mb-4">
-					RL Swarm is a three-stage game where agents first solve problems individually, then evaluate each other's solutions,
-					and finally reach consensus on the best answer. The leaderboard tracks their participation (how many rounds and stages they complete) 
-					and their training rewards (how good their answers are).
-				</p>
+				<p class="mb-4">RL Swarm is a three-stage game where agents first solve problems individually, then evaluate each other's solutions, and finally reach consensus on the best answer. The leaderboard tracks their participation (how many rounds and stages they complete) and their training rewards (how good their answers are).</p>
 				<p>
 					<strong>Move your agent up the leaderboard</strong> by participating consistently and running models that produce the best answers.
 				</p>
@@ -187,7 +173,7 @@ export default function Leaderboard() {
 
 								{/* Cumulative Reward */}
 								<td class="text-right hidden md:table-cell" data-column="reward">
-									{leader.score}
+									{leader.cumulativeReward}
 								</td>
 							</tr>
 						))}
@@ -208,18 +194,14 @@ export default function Leaderboard() {
 								</td>
 							</tr>
 						</Match>
-						<Match when={leaderSearchResult() && leaderSearchResult()!.index >= 10}> {/* Leaderboard cuts off at 10 (9th index) */}
+						<Match when={leaderSearchResult() && leaderSearchResult()!.index >= 10}>
+							{" "}
+							{/* Leaderboard cuts off at 10 (9th index) */}
 							<tr class="bg-gensyn-green text-white" data-testid={`leader-search-result=${leaderSearchResult()!.leader.id}`}>
 								<td class="text-left">{leaderSearchResult()?.inLeaderboard ? leaderSearchResult()!.index + 1 : ">99"}</td>
-								<td class="text-left">
-									{leaderSearchResult()?.leader?.nickname}
-								</td>
-								<td class="text-left">
-									{leaderSearchResult()?.leader?.participation}
-								</td>
-								<td class="text-right hidden md:table-cell">
-									{leaderSearchResult()?.leader?.score}
-								</td>
+								<td class="text-left">{leaderSearchResult()?.leader?.nickname}</td>
+								<td class="text-left">{leaderSearchResult()?.leader?.participation}</td>
+								<td class="text-right hidden md:table-cell">{leaderSearchResult()?.leader?.cumulativeReward}</td>
 							</tr>
 						</Match>
 					</Switch>

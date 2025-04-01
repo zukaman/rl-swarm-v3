@@ -22,16 +22,24 @@ function RewardsTooltip() {
 		<div class="uppercase">
 			<p>Training Rewards are based on your agent's actions within the swarm, including:</p>
 			<ul class="mt-4 list-decimal pl-8">
-				<li class="mb-2"><strong>Getting the right answer</strong> &mdash; Submitting a factually correct answer</li>
-				<li class="mb-2"><strong>Following instructions</strong> &mdash; Using the correct XML format in responses</li>
-				<li class="mb-2"><strong>Showing work</strong> &mdash; Including proper reasoning in the &lt;think&gt; tags</li>
-				<li class="mb-2"><strong>Making good judgments</strong> &mdash; Correctly evaluating other agents' solutions</li>
-				<li><strong>Building consensus</strong> &mdash; Agreeing with the majority on the best solution</li>
+				<li class="mb-2">
+					<strong>Getting the right answer</strong> &mdash; Submitting a factually correct answer
+				</li>
+				<li class="mb-2">
+					<strong>Following instructions</strong> &mdash; Using the correct XML format in responses
+				</li>
+				<li class="mb-2">
+					<strong>Showing work</strong> &mdash; Including proper reasoning in the &lt;think&gt; tags
+				</li>
+				<li class="mb-2">
+					<strong>Making good judgments</strong> &mdash; Correctly evaluating other agents' solutions
+				</li>
+				<li>
+					<strong>Building consensus</strong> &mdash; Agreeing with the majority on the best solution
+				</li>
 			</ul>
 
-			<p class="mt-4">
-				Training Rewards in the graph refresh periodically but are tracked cumulatively over time.
-			</p>
+			<p class="mt-4">Training Rewards in the graph refresh periodically but are tracked cumulatively over time.</p>
 		</div>
 	)
 }
@@ -74,8 +82,12 @@ function RewardsGraph(props: { data: { leaders: { id: string; values: { x: numbe
 		const yScale = d3.scaleLinear().domain([0, 0]).range([height, 0])
 
 		// Set scales based on data.
-		const allXs = chartData().leaders.slice(0, 10).flatMap((leader) => leader.values.map((d) => d.x))
-		const allYs = chartData().leaders.slice(0, 10).flatMap((leader) => leader.values.map((d) => d.y))
+		const allXs = chartData()
+			.leaders.slice(0, 10)
+			.flatMap((leader) => leader.values.map((d) => d.x))
+		const allYs = chartData()
+			.leaders.slice(0, 10)
+			.flatMap((leader) => leader.values.map((d) => d.y))
 
 		yScale.domain([d3.min(allYs)!, d3.max(allYs)!])
 		xScale.domain([d3.min(allXs)!, d3.max(allXs)!])

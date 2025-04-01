@@ -107,6 +107,7 @@ class Cache:
                 existing_entries = {entry["id"]: entry for entry in self.leaderboard_v2["leaders"]}
                 
                 # Process each peer's rewards
+                current_time = int(datetime.now().timestamp())
                 for peer_id, score in rewards.items():
                     if peer_id not in existing_entries:
                         # First time seeing this peer
@@ -116,7 +117,8 @@ class Cache:
                             "recordedRound": curr_round,
                             "recordedStage": curr_stage,
                             "cumulativeScore": float(score),  # Initial score
-                            "lastScore": float(score)  # Track last score
+                            "lastScore": float(score),  # Track last score
+                            "scoreHistory": [{"x": current_time, "y": float(score)}]  # Initialize history with first point
                         }
                     else:
                         entry = existing_entries[peer_id]
@@ -125,12 +127,16 @@ class Cache:
                             entry["recordedStage"] == curr_stage):
                             entry["cumulativeScore"] = float(score)
                             entry["lastScore"] = float(score)  # Update last score
+                            # Update history, keeping last 30 points
+                            entry["scoreHistory"] = (entry["scoreHistory"] + [{"x": current_time, "y": float(score)}])[-30:]
                         # Different round/stage - add to cumulative
                         else:
                             entry["cumulativeScore"] += float(score)
                             entry["lastScore"] = float(score)  # Update last score
                             entry["recordedRound"] = curr_round
                             entry["recordedStage"] = curr_stage
+                            # Add new score to history, keeping last 30 points
+                            entry["scoreHistory"] = (entry["scoreHistory"] + [{"x": current_time, "y": entry["cumulativeScore"]}])[-30:]
 
                 # Remove entries that are not in the current or previous round/stage.
                 prev_round, prev_stage = self._last_round_and_stage(curr_round, curr_stage)

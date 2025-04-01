@@ -6,7 +6,6 @@ import LoadingSpinner from "./LoadingSpinner"
 export default function Gossip() {
 	const ctx = useSwarm()
 
-
 	let containerRef: HTMLDivElement | undefined
 
 	const scrollToBottom = () => {
@@ -30,12 +29,7 @@ export default function Gossip() {
 	})
 
 	const GossipTooltip = () => {
-		return (
-			<div class="uppercase">
-				Gossip shows the outputs from the agents throughout the game, including their responses to 
-				the dataset prompts and to each other.
-			</div>
-		)
+		return <div class="uppercase">Gossip shows the outputs from the agents throughout the game, including their responses to the dataset prompts and to each other.</div>
 	}
 
 	return (
@@ -87,13 +81,9 @@ const processMessage = (message: string): { text: string; isHighlighted: boolean
 	// Split message into segments based on patterns
 	const segments = []
 	let lastIndex = 0
-	
+
 	// Find all matches and their positions
-	const matches = [
-		...message.matchAll(reAnswer),
-		...message.matchAll(reMajority), 
-		...message.matchAll(reIdentify)
-	].sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+	const matches = [...message.matchAll(reAnswer), ...message.matchAll(reMajority), ...message.matchAll(reIdentify)].sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
 
 	// Build segments array with type info
 	for (const match of matches) {
@@ -102,13 +92,13 @@ const processMessage = (message: string): { text: string; isHighlighted: boolean
 			if (match.index > lastIndex) {
 				segments.push({
 					text: message.slice(lastIndex, match.index),
-					isHighlighted: false
+					isHighlighted: false,
 				})
 			}
 			// Add highlighted match
 			segments.push({
 				text: match[0],
-				isHighlighted: true
+				isHighlighted: true,
 			})
 			lastIndex = match.index + match[0].length
 		}
@@ -118,7 +108,7 @@ const processMessage = (message: string): { text: string; isHighlighted: boolean
 	if (lastIndex < message.length) {
 		segments.push({
 			text: message.slice(lastIndex),
-			isHighlighted: false
+			isHighlighted: false,
 		})
 	}
 

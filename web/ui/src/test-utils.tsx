@@ -1,6 +1,6 @@
 import { ParentProps } from "solid-js"
-import { SwarmContext, SwarmContextType } from "./SwarmContext"
-import { LeaderboardResponse, RewardsResponse, RewardsHistory, GossipResponse } from "./swarm.api"
+import { LeaderboardData, SwarmContext, SwarmContextType } from "./SwarmContext"
+import { RewardsHistory, GossipResponse } from "./swarm.api"
 
 export const defaultMockSwarmContext: SwarmContextType = {
 	gossipMessages: () => null,
@@ -11,36 +11,28 @@ export const defaultMockSwarmContext: SwarmContextType = {
 	uniqueVoters: () => -1,
 	uniqueVotersLoading: () => false,
 	uniqueVotersError: () => null,
-	rewards: () => null,
-	rewardsLoading: () => false,
-	rewardsError: () => null,
 	rewardsHistory: () => null,
 	rewardsHistoryLoading: () => false,
 	rewardsHistoryError: () => null,
 	currentRound: () => -1,
 	currentStage: () => -1,
-	pollCount: () => 0,
 }
 
 interface MockSwarmProviderProps extends ParentProps {
 	values: {
 		gossipMessages?: () => GossipResponse | null | undefined
-		leaders?: () => LeaderboardResponse | null | undefined
+		leaders?: () => LeaderboardData | null | undefined
 		leadersLoading?: () => boolean
 		leadersError?: () => Error | null
 		nodesConnected?: () => number
 		uniqueVoters?: () => number
 		uniqueVotersLoading?: () => boolean
 		uniqueVotersError?: () => Error | null
-		rewards?: () => RewardsResponse | null | undefined
-		rewardsLoading?: () => boolean
-		rewardsError?: () => Error | null
 		rewardsHistory?: () => RewardsHistory | null | undefined
 		rewardsHistoryLoading?: () => boolean
 		rewardsHistoryError?: () => Error | null
 		currentRound?: () => number
 		currentStage?: () => number
-		pollCount?: () => number
 	}
 }
 
@@ -55,15 +47,11 @@ export function MockSwarmProvider(props: MockSwarmProviderProps) {
 		uniqueVoters: () => props.values.uniqueVoters?.() || defaultMockSwarmContext.uniqueVoters(),
 		uniqueVotersLoading: () => props.values.uniqueVotersLoading?.() || defaultMockSwarmContext.uniqueVotersLoading(),
 		uniqueVotersError: () => props.values.uniqueVotersError?.() || defaultMockSwarmContext.uniqueVotersError(),
-		rewards: () => props.values.rewards?.() || defaultMockSwarmContext.rewards(),
-		rewardsLoading: () => props.values.rewardsLoading?.() || defaultMockSwarmContext.rewardsLoading(),
-		rewardsError: () => props.values.rewardsError?.() || defaultMockSwarmContext.rewardsError(),
 		rewardsHistory: () => props.values.rewardsHistory?.() || defaultMockSwarmContext.rewardsHistory(),
 		rewardsHistoryLoading: () => props.values.rewardsHistoryLoading?.() || defaultMockSwarmContext.rewardsHistoryLoading(),
 		rewardsHistoryError: () => props.values.rewardsHistoryError?.() || defaultMockSwarmContext.rewardsHistoryError(),
 		currentRound: () => props.values.currentRound?.() || defaultMockSwarmContext.currentRound(),
 		currentStage: () => props.values.currentStage?.() || defaultMockSwarmContext.currentStage(),
-		pollCount: () => props.values.pollCount?.() || defaultMockSwarmContext.pollCount(),
 	}
 
 	return <SwarmContext.Provider value={value}>{props.children}</SwarmContext.Provider>
