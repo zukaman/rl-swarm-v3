@@ -22,6 +22,8 @@ class Cache:
 
     def reset(self):
         self.leaderboard = self.manager.dict()
+        self.leaderboard_v2 = self.manager.dict() # Cumulative rewards leaderboard.
+
         self.rewards_history = self.manager.dict()
         self.gossips = self.manager.dict()
 
@@ -36,6 +38,9 @@ class Cache:
     def get_leaderboard(self):
         return dict(self.leaderboard)
 
+    def get_leaderboard_cumulative(self):
+        return dict(self.leaderboard_v2)
+
     def get_gossips(self, since_round=0):
         return dict(self.gossips)
 
@@ -46,6 +51,7 @@ class Cache:
         try:
             self._get_round_and_stage()
             self._get_leaderboard()
+            self._get_leaderboard_v2()
             self._get_gossip()
 
             with self.lock:
@@ -82,6 +88,77 @@ class Cache:
         curr_round = self.current_round.value
         curr_stage = self.current_stage.value
         return self._get_dht_value(key=rewards_key(curr_round, curr_stage), latest=True)
+
+    def _get_leaderboard_v2(self):
+        try:
+            rewards = self._current_rewards()
+            if not rewards:
+                return None
+
+            curr_round = self.current_round.value
+            curr_stage = self.current_stage.value
+            
+            with self.lock:
+                # Initialize or get existing leaderboard_v2
+                if "leaders" not in self.leaderboard_v2:
+                    self.leaderboard_v2 = {"leaders": []}
+                
+                # Create a map of existing entries for easy lookup
+                existing_entries = {entry["id"]: entry for entry in self.leaderboard_v2["leaders"]}
+                
+                # Process each peer's rewards
+                for peer_id, score in rewards.items():
+                    if peer_id not in existing_entries:
+                        # First time seeing this peer
+                        existing_entries[peer_id] = {
+                            "id": peer_id,
+                            "nickname": get_name_from_peer_id(peer_id),
+                            "recordedRound": curr_round,
+                            "recordedStage": curr_stage,
+                            "cumulativeScore": float(score),  # Initial score
+                            "lastScore": float(score)  # Track last score
+                        }
+                    else:
+                        entry = existing_entries[peer_id]
+                        # Same round/stage - just update current score
+                        if (entry["recordedRound"] == curr_round and 
+                            entry["recordedStage"] == curr_stage):
+                            entry["cumulativeScore"] = float(score)
+                            entry["lastScore"] = float(score)  # Update last score
+                        # Different round/stage - add to cumulative
+                        else:
+                            entry["cumulativeScore"] += float(score)
+                            entry["lastScore"] = float(score)  # Update last score
+                            entry["recordedRound"] = curr_round
+                            entry["recordedStage"] = curr_stage
+
+                # Remove entries that are not in the current or previous round/stage.
+                prev_round, prev_stage = self._last_round_and_stage(curr_round, curr_stage)
+                current_entries = {}
+                for peer_id, entry in existing_entries.items():
+                    in_current = (entry["recordedRound"] == curr_round and entry["recordedStage"] == curr_stage)
+                    in_prev = (entry["recordedRound"] == prev_round and entry["recordedStage"] == prev_stage)
+                    if in_current or in_prev:
+                        current_entries[peer_id] = entry
+
+                # Convert back to sorted list
+                sorted_leaders = sorted(
+                    current_entries.values(),
+                    key=lambda x: (x["cumulativeScore"], x["id"]),
+                    reverse=True
+                )
+
+                # Update leaderboard_v2
+                self.leaderboard_v2 = {
+                    "leaders": sorted_leaders,
+                    "total": len(sorted_leaders)
+                }
+
+                return self.leaderboard_v2
+
+        except Exception as e:
+            self.logger.warning("could not get leaderboard data: %s", e)
+            return None
 
     def _get_leaderboard(self):
         try:

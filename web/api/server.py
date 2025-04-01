@@ -112,6 +112,23 @@ def get_leaderboard():
         }
 
 
+@app.get("/api/leaderboard-cumulative")
+def get_leaderboard_cumulative():
+    leaderboard = global_dht.dht_cache.get_leaderboard_cumulative()
+    res = dict(leaderboard)
+
+    if res is not None:
+        return {
+            "leaders": res.get("leaders", []),
+            "total": res.get("total", 0),
+        }
+    else:
+        return {
+            "leaders": [],
+            "total": 0,
+        }
+
+
 @app.get("/api/rewards-history")
 def get_rewards_history():
     leaderboard = global_dht.dht_cache.get_leaderboard()
