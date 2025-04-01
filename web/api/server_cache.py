@@ -1,6 +1,8 @@
+from collections import defaultdict
 import hashlib
 import itertools
 from datetime import datetime
+import random
 
 from .gossip_utils import *
 
@@ -74,9 +76,9 @@ class Cache:
                 "could not get current round or stage; default to -1: %s", e
             )
 
-    def _last_round_and_stage(self, round_num, stage):
-        r = round_num
-        s = stage - 1
+    def _previous_round_and_stage(self):
+        r = self.current_round.value
+        s = self.current_stage.value - 1
         if s == -1:
             s = 2
             r -= 1
@@ -87,7 +89,10 @@ class Cache:
         # Basically a proxy for the reachable peer group.
         curr_round = self.current_round.value
         curr_stage = self.current_stage.value
-        return self._get_dht_value(key=rewards_key(curr_round, curr_stage), latest=True)
+        return self._get_dht_value(key=rewards_key(curr_round, curr_stage))
+
+    def _previous_rewards(self):
+        return self._get_dht_value(key=rewards_key(*self._previous_round_and_stage()))
 
     def _get_leaderboard_v2(self):
         try:
@@ -97,15 +102,15 @@ class Cache:
 
             curr_round = self.current_round.value
             curr_stage = self.current_stage.value
-            
+
             with self.lock:
                 # Initialize or get existing leaderboard_v2
                 if "leaders" not in self.leaderboard_v2:
                     self.leaderboard_v2 = {"leaders": []}
-                
+
                 # Create a map of existing entries for easy lookup
                 existing_entries = {entry["id"]: entry for entry in self.leaderboard_v2["leaders"]}
-                
+
                 # Process each peer's rewards
                 current_time = int(datetime.now().timestamp())
                 for peer_id, score in rewards.items():
@@ -123,7 +128,7 @@ class Cache:
                     else:
                         entry = existing_entries[peer_id]
                         # Same round/stage - just update current score
-                        if (entry["recordedRound"] == curr_round and 
+                        if (entry["recordedRound"] == curr_round and
                             entry["recordedStage"] == curr_stage):
                             entry["cumulativeScore"] = float(score)
                             entry["lastScore"] = float(score)  # Update last score
@@ -168,8 +173,7 @@ class Cache:
 
     def _get_leaderboard(self):
         try:
-            rewards = self._current_rewards()
-            if rewards:
+            if rewards := self._current_rewards():
                 # Sorted list of (node_key, reward) pairs.
                 raw = list(
                     sorted(rewards.items(), key=lambda t: (t[1], t[0]), reverse=True)
@@ -228,7 +232,8 @@ class Cache:
             self.logger.warning("could not get leaderboard data: %s", e)
 
     def _get_gossip(self):
-        STAGE_GOSSIP_LIMIT = 10  # Most recent.
+        MESSAGE_TARGET = 200
+        NODE_TARGET = 20
         STAGE_MESSAGE_FNS = [stage1_message, stage2_message, stage3_message]
 
         round_gossip = []
@@ -236,15 +241,21 @@ class Cache:
         try:
             curr_round = self.current_round.value
             curr_stage = self.current_stage.value
-            curr_rewards = self._current_rewards()
-            if not curr_rewards:
-                raise ValueError("missing curr_rewards")
+            rewards = self._current_rewards()
+            if not rewards:
+                raise ValueError("missing rewards")
 
-            nodes = curr_rewards.keys()
+            all_nodes = rewards.keys()
+            nodes = random.sample(
+                list(all_nodes), min(NODE_TARGET, len(all_nodes))
+            )  # Sample uniformly
+            node_gossip_count = defaultdict(int)
+            node_gossip_limit = max(1, MESSAGE_TARGET / len(nodes))
+
             start_round = max(0, curr_round - 3)
-            for round_num, stage, node_key in itertools.product(
-                range(start_round, curr_round + 1),
-                range(0, 3),
+            for r, s, node_key in itertools.product(
+                reversed(range(start_round, curr_round + 1)),  # Most recent first
+                reversed(range(0, 3)),
                 nodes,
             ):
                 # Check if we've exceeded 10 seconds
@@ -253,26 +264,26 @@ class Cache:
                     self.logger.warning(">>> gossip collection timed out after 10s")
                     break
 
-                if round_num > curr_round or (
-                    round_num == curr_round and stage > curr_stage
-                ):
+                if r == curr_round and s > curr_stage:
+                    continue
+
+                if node_gossip_count[node_key] > node_gossip_limit:
                     break
 
-                key = outputs_key(node_key, round_num, stage)
-                if outputs := self._get_dht_value(key=key):
+                if outputs := self._get_dht_value(key=outputs_key(node_key, r, s)):
                     sorted_outputs = sorted(
                         list(outputs.items()), key=lambda t: t[1][0]
                     )
-                    for question, (ts, outputs) in sorted_outputs[-STAGE_GOSSIP_LIMIT:]:
+                    for question, (ts, outputs) in sorted_outputs:
                         gossip_id = hashlib.md5(
-                            f"{node_key}_{round_num}_{stage}_{question}".encode()
+                            f"{node_key}_{r}_{s}_{question}".encode()
                         ).hexdigest()
-                        if stage < len(STAGE_MESSAGE_FNS):
-                            message = STAGE_MESSAGE_FNS[stage](
+                        if s < len(STAGE_MESSAGE_FNS):
+                            message = STAGE_MESSAGE_FNS[s](
                                 node_key, question, ts, outputs
                             )
                         else:
-                            message = f"Cannot render output for unknown stage {stage}"
+                            message = f"Cannot render output for unknown stage {s}"
                         round_gossip.append(
                             (
                                 ts,
@@ -283,6 +294,10 @@ class Cache:
                                 },
                             )
                         )
+                        node_gossip_count[node_key] += 1
+                        if node_gossip_count[node_key] > node_gossip_limit:
+                            break
+
         except Exception as e:
             self.logger.warning("could not get gossip: %s", e)
         finally:
