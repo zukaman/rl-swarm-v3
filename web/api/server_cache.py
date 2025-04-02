@@ -96,6 +96,7 @@ class Cache:
     def _previous_rewards(self):
         return self._get_dht_value(key=rewards_key(*self._previous_round_and_stage()))
 
+
     def _get_leaderboard_v2(self):
         try:
             rewards = self._current_rewards()
@@ -153,6 +154,8 @@ class Cache:
                     in_prev = (entry["recordedRound"] == prev_round and entry["recordedStage"] == prev_stage)
                     if in_current or in_prev:
                         current_entries[peer_id] = entry
+                    else:
+                        self.logger.info(f"removing entry for peer {peer_id} because it is not in the current or previous round/stage")
 
                 # Convert back to sorted list
                 sorted_leaders = sorted(

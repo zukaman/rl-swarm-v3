@@ -252,7 +252,6 @@ export function SwarmProvider(props: ParentProps) {
 async function fetchLeaderboardData(): Promise<LeaderboardData | undefined> {
 	try {
 		const monolithicData = await api.getLeaderboardCumulative()
-		console.log(">>> monolithicData.leaders.length", monolithicData.leaders.length)
 		return {
 			leaders: monolithicData.leaders,
 			totalPeers: monolithicData.totalPeers,

@@ -1,19 +1,21 @@
-import { onMount, createEffect, Switch, Match } from "solid-js"
+import { onMount, createEffect, Switch, Match, createMemo } from "solid-js"
 import { useSwarm } from "../SwarmContext"
 import SectionHeader from "./SectionHeader"
 import LoadingSpinner from "./LoadingSpinner"
+import Scrollable from "./Scrollable"
 
 export default function Gossip() {
 	const ctx = useSwarm()
 
-	let containerRef: HTMLDivElement | undefined
+	let containerRef: HTMLElement | undefined
 
 	const scrollToBottom = () => {
 		if (containerRef) {
 			// Use requestAnimationFrame to ensure DOM has updated
 			// Ensures we scroll after the browser paints new content
 			requestAnimationFrame(() => {
-				containerRef!.scrollTop = containerRef!.scrollHeight
+				const scrollHeight = containerRef!.scrollHeight
+				containerRef!.scrollTop = scrollHeight
 			})
 		}
 	}
@@ -28,6 +30,11 @@ export default function Gossip() {
 		scrollToBottom()
 	})
 
+	const hideScrollbar = createMemo(() => {
+		const len = ctx.gossipMessages()?.messages.length ?? 0
+		return len < 1
+	})
+
 	const GossipTooltip = () => {
 		return <div class="uppercase">Gossip shows the outputs from the agents throughout the game, including their responses to the dataset prompts and to each other.</div>
 	}
@@ -36,26 +43,28 @@ export default function Gossip() {
 		<section class="flex flex-grow flex-col gap-2">
 			<SectionHeader title="gossip" tooltip={GossipTooltip()} />
 
-			<div ref={containerRef} class="overflow-scroll overflow-x-hidden flex-grow min-h-0 max-h-[300px]" id="gossip-container">
-				<ul class="list-none">
-					<Switch>
-						<Match when={ctx.gossipMessages()?.messages.length ?? 0 > 0}>
-							{ctx.gossipMessages()?.messages.map((msg) => {
-								return (
-									<li class="mt-4">
-										<NodeMessage id={msg.node} message={msg.message} />
-									</li>
-								)
-							})}
-						</Match>
-						<Match when={true}>
-							<span>
-								<LoadingSpinner message="Fetching gossip..." />
-							</span>
-						</Match>
-					</Switch>
-				</ul>
-			</div>
+			<Scrollable class="flex-grow min-h-0 max-h-[300px]" ref={(el) => { containerRef = el }} hideScrollbar={hideScrollbar()}>
+				<div class="mr-4 min-h-60">{/*class="overflow-scroll overflow-x-hidden flex-grow min-h-0 max-h-[300px]" id="gossip-container">*/}
+					<ul class="list-none">
+						<Switch>
+							<Match when={ctx.gossipMessages()?.messages.length ?? 0 > 0}>
+								{ctx.gossipMessages()?.messages.map((msg) => {
+									return (
+										<li class="mt-4">
+											<NodeMessage id={msg.node} message={msg.message} />
+										</li>
+									)
+								})}
+							</Match>
+							<Match when={true}>
+								<span>
+									<LoadingSpinner message="Fetching gossip..." />
+								</span>
+							</Match>
+						</Switch>
+					</ul>
+				</div>
+			</Scrollable>
 		</section>
 	)
 }

@@ -2,22 +2,25 @@ import { LeaderboardData, useSwarm } from "../SwarmContext"
 import LoadingSpinner from "./LoadingSpinner"
 import ErrorMessage from "./ErrorMessage"
 import SectionHeader from "./SectionHeader"
-import { createResource, createSignal, Show, Switch, Match } from "solid-js"
+import { createResource, createSignal, Show, createEffect } from "solid-js"
+import Scrollable from "./Scrollable"
 
 export default function Leaderboard() {
 	const { leaders, leadersLoading, leadersError, nodesConnected, uniqueVoters, uniqueVotersLoading } = useSwarm()
+	let containerRef: HTMLDivElement | undefined
 
 	// Search state: input is the raw text from the <input>, but query is what is searched for.
 	// This only exists in two signals so that we search on submit, not on each keystroke.
 	const [searchInput, setSearchInput] = createSignal("")
 	const [leaderSearchQuery, setLeaderSearchQuery] = createSignal<string | null>(null)
+	const [leaderSearchResultError, setLeaderSearchResultError] = createSignal<Error | null>(null)
 	const [searchTrigger, setSearchTrigger] = createSignal(0)
 
 	type SearchResult = {
 		index: number
 		leader: LeaderboardData["leaders"][number]
 		inLeaderboard: boolean
-	}
+	} 
 
 	// This is a little hacky, but I want to allow triggering another search even if the leaderSearchQuery hasn't changed.
 	// The searchTrigger() signal is incremented with each search, so we can always re-fire the search.
@@ -25,11 +28,13 @@ export default function Leaderboard() {
 		() => ({
 			query: leaderSearchQuery(),
 			trigger: searchTrigger(),
-			leaders: leaders(), // Now we always refresh the searched data when the leaderboard changes.
+			leaders: leaders(),
 		}),
 		async ({ query, leaders }) => {
+			setLeaderSearchResultError(null)
+
 			if (!query || query.length === 0) {
-				return
+				return null
 			}
 
 			const index = leaders?.leaders.findIndex((leader) => {
@@ -39,13 +44,15 @@ export default function Leaderboard() {
 
 			if (index !== undefined && index !== null && index >= 0) {
 				return {
-					index: index,
+					index,
 					leader: leaders?.leaders[index],
 					inLeaderboard: true,
 				} as SearchResult
 			}
 
-			throw new Error(`could not find peer ${query} in top 100 of leaderboard`)
+			setLeaderSearchResultError(new Error(`could not find peer ${query} in top 100 of leaderboard`))
+
+			return null
 		},
 	)
 
@@ -76,6 +83,31 @@ export default function Leaderboard() {
 		return matchId || matchName
 	}
 
+	const scrollToLeader = (index: number) => {
+		if (!containerRef) {
+			return
+		}
+
+		const itemPath = `[data-testid="leader-${leaders()?.leaders[index].id}"]`
+
+		const leaderElement = containerRef.querySelector(itemPath)
+		if (!leaderElement) {
+			return
+		}
+		
+		leaderElement.scrollIntoView({
+			behavior: 'smooth',
+			block: 'center'
+		})
+	}
+
+	// Watch for search results and scroll when found
+	createEffect(() => {
+		if (leaderSearchResult()?.inLeaderboard) {
+			scrollToLeader(leaderSearchResult()!.index)
+		}
+	})
+
 	// Only show spinner on the first render.
 	// Otherwise we silently refresh.
 	if (leadersLoading() && leaders()?.leaders.length === 0) {
@@ -102,7 +134,6 @@ export default function Leaderboard() {
 			{/* Stats */}
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
 				<div class="border border-2 border-dotted p-2">
-					{/* This value comes from the leaderboard API since it's the total number of peers (DHT). */}
 					Current Nodes Connected:
 					<Show when={leadersLoading() && leaders()?.leaders.length === 0} fallback={nodesConnected()}>
 						<LoadingSpinner message="..." />
@@ -128,85 +159,66 @@ export default function Leaderboard() {
 						</button>
 					</form>
 				</div>
+				<Show when={leaderSearchResultError()}>
+					<div class="md:col-span-2 mb-2">
+						<ErrorMessage message={leaderSearchResultError()?.message || "Failed to search leaderboard"} />
+					</div>
+				</Show>
 			</div>
 
-			<table class="min-w-full table-auto border-collapse border-dotted border-separate border-spacing-1 border-spacing-x-0 border-2 py-1 px-4">
-				<thead>
-					<tr class="align-top">
-						<th class="font-normal text-left w-auto relative">
-							Rank
-							<span class="absolute bottom-0 left-0 w-[90%] border-b border-dotted"></span>
-						</th>
-						<th class="font-normal text-left w-auto relative">
-							Name
-							<span class="absolute bottom-0 left-0 w-[90%] border-b border-dotted"></span>
-						</th>
-						<th class="font-normal text-left w-auto pr-4 relative">
-							Participation
-							<span class="absolute bottom-0 left-0 w-[90%] border-b border-dotted"></span>
-						</th>
-						<th class="font-normal text-left w-auto relative hidden md:table-cell">
-							Training&nbsp;Reward
-							<span class="absolute bottom-0 left-0 w-[100%] border-b border-dotted"></span>
-						</th>
-					</tr>
-				</thead>
-				<tbody class="uppercase">
-					{leaders()
-						?.leaders.slice(0, 10)
-						.map((leader, index) => (
-							<tr classList={{ "bg-gensyn-green text-white": isSearchedLeader(leader) }} data-testid={`leader-${leader.id}`}>
-								{/* Rank */}
-								<td class="text-left" data-column="rank">
-									{index + 1}
-								</td>
+			<div class="relative">
+				<Scrollable class="max-h-[270px] border-2 border-dotted">
+					<div ref={containerRef}>
+						<table class="min-w-full table-auto border-collapse border-dotted border-separate border-spacing-1 border-spacing-x-0 py-1 px-4">
+							<thead>
+								<tr class="align-top">
+									<th class="font-normal text-left w-auto relative">
+										Rank
+										<span class="absolute bottom-0 left-0 w-[90%] border-b border-dotted"></span>
+									</th>
+									<th class="font-normal text-left w-auto relative">
+										Name
+										<span class="absolute bottom-0 left-0 w-[90%] border-b border-dotted"></span>
+									</th>
+									<th class="font-normal text-left w-auto pr-4 relative">
+										Participation
+										<span class="absolute bottom-0 left-0 w-[90%] border-b border-dotted"></span>
+									</th>
+									<th class="font-normal text-left w-auto relative hidden md:table-cell">
+										Training&nbsp;Reward
+										<span class="absolute bottom-0 left-0 w-[100%] border-b border-dotted"></span>
+									</th>
+								</tr>
+							</thead>
+							<tbody class="uppercase">
+								{leaders()?.leaders.map((leader, index) => (
+									<tr classList={{ "bg-gensyn-green text-white": isSearchedLeader(leader) }} data-testid={`leader-${leader.id}`}>
+										{/* Rank */}
+										<td class="text-left" data-column="rank">
+											{index + 1}
+										</td>
 
-								{/* Name */}
-								<td class="text-left" data-column="name">
-									{leader.nickname}
-								</td>
+										{/* Name */}
+										<td class="text-left" data-column="name">
+											{leader.nickname}
+										</td>
 
-								{/* Participation */}
-								<td class="text-left" data-column="participation">
-									{leader.participation}
-								</td>
+										{/* Participation */}
+										<td class="text-left" data-column="participation">
+											{leader.participation}
+										</td>
 
-								{/* Cumulative Reward */}
-								<td class="text-right hidden md:table-cell" data-column="reward">
-									{leader.cumulativeReward}
-								</td>
-							</tr>
-						))}
-				</tbody>
-				<tbody class="uppercase">
-					<Switch>
-						<Match when={leaderSearchResult.loading}>
-							<tr>
-								<td colspan="4" class="text-center">
-									<LoadingSpinner message="Searching..." />
-								</td>
-							</tr>
-						</Match>
-						<Match when={leaderSearchResult.error}>
-							<tr>
-								<td colspan="4" class="text-center">
-									<ErrorMessage message={`${leaderSearchResult.error?.message || "Failed to search leaderboard"}`} />
-								</td>
-							</tr>
-						</Match>
-						<Match when={leaderSearchResult() && leaderSearchResult()!.index >= 10}>
-							{" "}
-							{/* Leaderboard cuts off at 10 (9th index) */}
-							<tr class="bg-gensyn-green text-white" data-testid={`leader-search-result=${leaderSearchResult()!.leader.id}`}>
-								<td class="text-left">{leaderSearchResult()?.inLeaderboard ? leaderSearchResult()!.index + 1 : ">99"}</td>
-								<td class="text-left">{leaderSearchResult()?.leader?.nickname}</td>
-								<td class="text-left">{leaderSearchResult()?.leader?.participation}</td>
-								<td class="text-right hidden md:table-cell">{leaderSearchResult()?.leader?.cumulativeReward}</td>
-							</tr>
-						</Match>
-					</Switch>
-				</tbody>
-			</table>
+										{/* Cumulative Reward */}
+										<td class="text-right hidden md:table-cell" data-column="reward">
+											{leader.cumulativeReward}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				</Scrollable>
+			</div>
 		</div>
 	)
 }
