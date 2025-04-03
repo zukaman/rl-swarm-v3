@@ -22,7 +22,7 @@ def main():
     root_logger.setLevel(logging.INFO)
     handler = colorlog.StreamHandler()
     handler.setFormatter(
-        colorlog.ColoredFormatter("%(light_red)s%(levelname)s:%(name)s:%(message)s")
+        colorlog.ColoredFormatter("%(green)s%(levelname)s:%(name)s:%(message)s")
     )
     root_logger.addHandler(handler)
 

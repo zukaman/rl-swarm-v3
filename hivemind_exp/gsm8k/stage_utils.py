@@ -77,7 +77,7 @@ def merged_prev_stage_datasets(
                     prev_outputs[node_key].append(outputs)
             except ValueError:
                 # Skip this node's answers for the current round and stage.
-                logger.info(
+                logger.debug(
                     f"Found rewards published for node: {node_key} but no outputs!"
                 )
 
