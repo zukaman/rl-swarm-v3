@@ -1,3 +1,4 @@
+import hashlib
 from functools import lru_cache
 from typing import Any
 
@@ -34,6 +35,17 @@ def node_outputs_key(node: HivemindNode) -> str:
     return outputs_key(node.key, node.round_num, node.stage_num)
 
 
+def hash_keys(outputs):
+    # Handles older versions of the trainer that did not hash question keys.
+    result = {}
+    for k, v in outputs.items():
+        if len(k) != 32:  # Not perfect, but good enough.
+            k = hashlib.md5(k.encode()).hexdigest()
+        result[k] = v
+
+    return result
+
+
 @lru_cache
 def get_outputs(
     dht: DHT, node_key: str, r, s, get_cached_fn=None
@@ -41,11 +53,11 @@ def get_outputs(
     # Try provided cache function first.
     if get_cached_fn:
         if outputs := get_cached_fn(r, s):
-            return outputs
+            return hash_keys(outputs)
 
     # Try from DHT next to include peered outputs.
     if outputs := get_dht_value(dht, key=outputs_key(node_key, r, s), latest=False):
-        return outputs
+        return hash_keys(outputs)
 
     raise ValueError(
         f"could not retrieve stage outputs for {node_key} at round {r} stage {s}"

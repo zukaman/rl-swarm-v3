@@ -29,6 +29,7 @@ def merged_prev_stage_datasets(
     s: int,
     merge_fn,
     samples_fn,
+    dht_sample_limit = 200,
     check_interval: float = 5,
     wait_timeout: float = 10,
     log_tag=None,
@@ -56,11 +57,11 @@ def merged_prev_stage_datasets(
         prev_rewards = get_prev_rewards()
 
     # Add the current node's local samples first.
-    prev_outputs: dict[str, list] = defaultdict(list)
+    prev_items: dict[str, list] = defaultdict(list)
     try:
         prev_node_outputs = get_outputs(dht, node.key, r, s - 1, node.get_stage_outputs)
-        for _, outputs in prev_node_outputs.values():
-            prev_outputs[node.key].append(outputs)
+        for item in prev_node_outputs.items():
+            prev_items[node.key].append(item)
     except ValueError:
         # Joined after the round has started.
         logger.info(f"Could not retrieve local outputs for round {r} stage {s - 1}")
@@ -68,26 +69,37 @@ def merged_prev_stage_datasets(
     # Add other nodes' samples iff rewards are available.
     if prev_rewards:
         node_keys = prev_rewards.keys()
+        dht_sample_count = 0
         for node_key in node_keys:
+            if dht_sample_count > dht_sample_limit:
+                break
+
             if node_key == node.key:
                 continue
             try:
                 prev_node_outputs = get_outputs(dht, node_key, r, s - 1)
-                for _, outputs in prev_node_outputs.values():
-                    prev_outputs[node_key].append(outputs)
+                for item in prev_node_outputs.items():
+                    prev_items[node_key].append(item)
+
+                    dht_sample_count += 1
+                    if dht_sample_count > dht_sample_limit:
+                        break
+
             except ValueError:
                 # Skip this node's answers for the current round and stage.
                 logger.debug(
                     f"Found rewards published for node: {node_key} but no outputs!"
                 )
 
-    #  Merge all samples.
-    q_to_keyed_outputs: dict[str, dict[str, Any]] = defaultdict(dict)
-    for node_key, all_outputs in prev_outputs.items():
-        for outputs in all_outputs:
-            q_to_keyed_outputs[outputs["question"]][node_key] = outputs
+    # Group samples by question hash.
+    q_to_keyed_items: dict[str, dict[str, Any]] = defaultdict(dict)
+    for node_key, items in prev_items.items():
+        for item in items:
+            q_hash, (_, outputs) = item
+            q_to_keyed_items[q_hash][node_key] = outputs
 
-    for outputs in q_to_keyed_outputs.values():
+    # Merge sample lists.
+    for outputs in q_to_keyed_items.values():
         merged = merge_fn(outputs)
         merged_qs.append(merged)
 

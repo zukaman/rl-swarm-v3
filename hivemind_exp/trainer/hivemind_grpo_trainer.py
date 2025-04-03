@@ -1,4 +1,5 @@
 import gc
+import hashlib
 import logging
 import time
 import traceback
@@ -69,15 +70,17 @@ class HivemindGRPOTrainer:
             # Reward function must save node.outputs + node.rewards!
             # This is only here to publish to the DHT at the right time.
             question = self.node.outputs["question"]
+            q_hash = hashlib.md5(question.encode()).hexdigest()
+
             value = (time.time(), self.node.outputs)
             self.dht.store(
                 key=node_outputs_key(self.node),
-                subkey=question,
+                subkey=q_hash,
                 value=value,
                 expiration_time=get_dht_time() + self.node.out_expiration,
             )
             self.node.put_stage_outputs(
-                self.node.round_num, self.node.stage_num, question, value
+                self.node.round_num, self.node.stage_num, q_hash, value
             )
 
             # Just the latest.

@@ -220,7 +220,7 @@ def test_gsm8k_stage_data(tmp_path):
     coord = HivemindNode.coordinator("test", CK)
     nodes = [HivemindNode("test", str(i)) for i in range(3)]
 
-    dht_trainers = [create_dht_and_trainer(Path(tmp_path) / "C", coord, min_peers=2)]
+    dht_trainers = [create_dht_and_trainer(Path(tmp_path) / "C", coord, min_peers=1)]
     dht0 = dht_trainers[0][0]
     for i, node in enumerate(nodes):
         dht_trainers.append(

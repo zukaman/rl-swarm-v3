@@ -1,4 +1,5 @@
 from copy import deepcopy
+import hashlib
 
 from hivemind_exp.dht_utils import ROUND_STAGE_NUMBER_KEY
 
@@ -6,6 +7,7 @@ CK = "GENSYN"
 RSK = ROUND_STAGE_NUMBER_KEY
 
 QUESTION = "What is the meaning of life?"
+QUESTION_HASH = hashlib.md5(QUESTION.encode()).hexdigest()
 
 SAMPLES = [
     {

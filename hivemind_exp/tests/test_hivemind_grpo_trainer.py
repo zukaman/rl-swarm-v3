@@ -16,7 +16,7 @@ from hivemind_exp.dht_utils import (
     rewards_key,
 )
 from hivemind_exp.hivemind_utils import SingleStageData, StageData
-from hivemind_exp.tests.fake_data import CK, QUESTION, RSK, SAMPLES
+from hivemind_exp.tests.fake_data import CK, QUESTION, QUESTION_HASH, RSK, SAMPLES
 from hivemind_exp.trainer.hivemind_grpo_trainer import (
     HivemindGRPOTrainer,
     get_dht_value,
@@ -209,7 +209,7 @@ def test_multi_node_single_stage(tmp_path):
     for r, s in itertools.product([0], [0]):
         outputs = get_dht_value(dht0, key=outputs_key(node0.key, r, s), latest=True)
         assert outputs
-        assert outputs[QUESTION][1] == {"question": QUESTION}
+        assert outputs[QUESTION_HASH][1] == {"question": QUESTION}
 
         rewards = get_dht_value(dht0, key=rewards_key(r, s), latest=True)
         assert rewards
@@ -292,7 +292,7 @@ def test_multi_node_multi_stage(tmp_path):
     for r, s in itertools.product(range(1), range(3)):
         outputs = get_dht_value(dht0, key=outputs_key(node0.key, r, s), latest=False)
         assert outputs
-        assert outputs[QUESTION][1] == {"question": QUESTION}
+        assert outputs[QUESTION_HASH][1] == {"question": QUESTION}
 
         rewards = get_dht_value(dht0, key=rewards_key(r, s), latest=False)
         assert rewards
