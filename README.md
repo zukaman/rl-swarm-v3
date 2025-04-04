@@ -33,7 +33,6 @@ source .venv/bin/activate
 
 Please answer 'Y' (or just press enter), N is provided as an alternative flow but isn't currently maintained.
 
-
 ### Login
 
 1. A browser window will pop open (you'll need to manually navigate to http://localhost:3000/ if you're on a VM).
