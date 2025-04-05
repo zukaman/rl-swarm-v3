@@ -12,3 +12,7 @@ runs/
 
 node_modules/
 web/ui/dist/
+
+/bazel-*
+/external
+/tmp
