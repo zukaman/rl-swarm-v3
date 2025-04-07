@@ -16,3 +16,5 @@ web/ui/dist/
 /bazel-*
 /external
 /tmp
+
+dist/
