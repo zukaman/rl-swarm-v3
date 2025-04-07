@@ -24,6 +24,10 @@ from hivemind_exp.hivemind_utils import HivemindNode, StageData
 from hivemind_exp.name_utils import get_name_from_peer_id
 
 
+MAX_TRAIN_FAILS = 5
+CADENCE_OF_UPDATE_STEPS = 4
+
+
 class HivemindGRPOTrainer:
     """
     Subclass of GRPOTrainer that implements multi-stage GRPO by publishing
@@ -69,28 +73,30 @@ class HivemindGRPOTrainer:
             loss = super().compute_loss(model, inputs, *args, **kwargs)
             # Reward function must save node.outputs + node.rewards!
             # This is only here to publish to the DHT at the right time.
-            question = self.node.outputs["question"]
-            q_hash = hashlib.md5(question.encode()).hexdigest()
+            # Only publish to DHT every N steps
+            if self.state.global_step % CADENCE_OF_UPDATE_STEPS == 0:
+                question = self.node.outputs["question"]
+                q_hash = hashlib.md5(question.encode()).hexdigest()
 
-            value = (time.time(), self.node.outputs)
-            self.dht.store(
-                key=node_outputs_key(self.node),
-                subkey=q_hash,
-                value=value,
-                expiration_time=get_dht_time() + self.node.out_expiration,
-            )
-            self.node.put_stage_outputs(
-                self.node.round_num, self.node.stage_num, q_hash, value
-            )
+                value = (time.time(), self.node.outputs)
+                self.dht.store(
+                    key=node_outputs_key(self.node),
+                    subkey=q_hash,
+                    value=value,
+                    expiration_time=get_dht_time() + self.node.out_expiration,
+                )
+                self.node.put_stage_outputs(
+                    self.node.round_num, self.node.stage_num, q_hash, value
+                )
 
-            # Just the latest.
-            self.stage_rewards += sum(self.node.rewards)
-            self.dht.store(
-                key=rewards_key(self.node.round_num, self.node.stage_num),
-                subkey=self.node.key,
-                value=self.stage_rewards,
-                expiration_time=get_dht_time() + self.node.out_expiration,
-            )
+                # Just the latest.
+                self.stage_rewards += sum(self.node.rewards)
+                self.dht.store(
+                    key=rewards_key(self.node.round_num, self.node.stage_num),
+                    subkey=self.node.key,
+                    value=self.stage_rewards,
+                    expiration_time=get_dht_time() + self.node.out_expiration,
+                )
             if self.node.is_coordinator:
                 self.publish_leaderboard()
 
@@ -115,6 +121,7 @@ class HivemindGRPOTrainer:
         self.stage_data = stage_data
 
         self.config = config
+        self.config.dataloader_num_workers=4  # Default: 8+
         assert self.config.output_dir
         self.config.output_dir += f"-{get_name_from_peer_id(self.node.key, True)}"  # TODO: Add animal name to save path in more appropriate spot
         self.model = model
@@ -207,7 +214,15 @@ class HivemindGRPOTrainer:
         self.node.clear_stage_cache()
 
     def train_and_save(self, trainer, train_dataset):
-        train_result = trainer.train()
+        for num_fails in range(MAX_TRAIN_FAILS):
+            try:
+                train_result = trainer.train()
+                break
+            except (BlockingIOError, EOFError) as e:
+                self.logger.warning(f"DHT IPC error: {e}. Restarting training...")
+                self.cleanup()  # Clear GPU/caches
+                time.sleep(5)
+                continue
 
         # Log and save metrics
         metrics = train_result.metrics
