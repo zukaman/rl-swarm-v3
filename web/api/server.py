@@ -18,6 +18,7 @@ from hivemind_exp.dht_utils import *
 from hivemind_exp.name_utils import *
 
 from . import global_dht
+from .kinesis import Kinesis
 
 # UI is served from the filesystem
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -279,7 +280,11 @@ def main(args):
 
     # Supplied with the bootstrap node, the client will have access to the DHT.
     logger.info(f"initializing DHT with peers {initial_peers}")
-    global_dht.setup_global_dht(initial_peers, coordinator, logger)
+
+    kinesis_stream = os.getenv("KINESIS_STREAM", "")
+    kinesis_client = Kinesis(kinesis_stream)
+
+    global_dht.setup_global_dht(initial_peers, coordinator, logger, kinesis_client)
 
     thread = Thread(target=populate_cache)
     thread.daemon = True

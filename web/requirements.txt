@@ -1,6 +1,8 @@
 aiofiles
+boto3
 fastapi[standard]
 uvicorn
+pydantic
 pytest
 opentelemetry-distro
 opentelemetry-exporter-otlp

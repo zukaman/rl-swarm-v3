@@ -1,24 +1,25 @@
 from collections import defaultdict
 import hashlib
 import itertools
-from datetime import datetime
+from datetime import datetime, timezone
 import random
-
+import os
 from .gossip_utils import *
 
 from hivemind_exp.dht_utils import *
 from hivemind_exp.name_utils import get_name_from_peer_id
 from .gossip_utils import stage1_message, stage2_message, stage3_message
+from .kinesis import GossipMessage, GossipMessageData, RewardsMessage, RewardsMessageData
 
 
 class Cache:
-    def __init__(self, dht, coordinator, manager, logger):
+    def __init__(self, dht, coordinator, manager, logger, kinesis_client):
         self.dht = dht
         self.coordinator = coordinator
 
         self.manager = manager
         self.logger = logger
-
+        self.kinesis_client = kinesis_client
         self.lock = manager.Lock()
         self.reset()
 
@@ -170,11 +171,65 @@ class Cache:
                     "total": len(sorted_leaders)
                 }
 
+                # Convert to RewardsMessage format and send to Kinesis
+                self._send_rewards_to_kinesis(sorted_leaders, curr_round, curr_stage)
+
                 return self.leaderboard_v2
 
         except Exception as e:
             self.logger.warning("could not get leaderboard data: %s", e)
             return None
+            
+
+    # Sends the rewards data to a Kinesis stream where it can be processed by the UI server.
+    def _send_rewards_to_kinesis(self, leaders, round, stage):
+        """Convert leaderboard data to RewardsMessage format and send to Kinesis"""
+        try:
+            current_time = datetime.now(timezone.utc)  
+            rewards_data = []
+            
+            for leader in leaders:
+                rewards_data.append(
+                    RewardsMessageData(
+                        peerId=leader["id"],
+                        peerName=leader["nickname"],
+                        amount=leader["cumulativeScore"],
+                        round=round,
+                        stage=stage,
+                        timestamp=current_time
+                    )
+                )
+                
+            rewards_message = RewardsMessage(type="rewards", data=rewards_data)
+            self.kinesis_client.put_rewards(rewards_message)
+            
+        except Exception as e:
+            self.logger.error(f"!!! Failed to send rewards to Kinesis: {e}")
+
+    def _send_gossip_to_kinesis(self, gossips):
+        try:
+            gossip_data = []
+
+            for ts, gossip in gossips:  # ts is a float timestamp
+                # Convert float timestamp to UTC datetime
+                dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+                    
+                gossip_data.append(
+                    GossipMessageData(
+                        id=gossip["id"],
+                        peerId=gossip["nodeId"],
+                        peerName=gossip["node"],
+                        message=gossip["message"],
+                        timestamp=dt  # Use the converted UTC datetime
+                    )
+                )
+
+            gossip_message = GossipMessage(type="gossip", data=gossip_data)
+            self.kinesis_client.put_gossip(gossip_message)
+            
+        except Exception as e:
+            self.logger.error(f"!!! Failed to send gossip to Kinesis: {e}")
+                
 
     def _get_leaderboard(self):
         try:
@@ -296,6 +351,7 @@ class Cache:
                                     "id": gossip_id,
                                     "message": message,
                                     "node": get_name_from_peer_id(node_key),
+                                    "nodeId": node_key,
                                 },
                             )
                         )
@@ -312,6 +368,8 @@ class Cache:
                 len(round_gossip),
                 elapsed,
             )
+
+        self._send_gossip_to_kinesis(round_gossip)
 
         with self.lock:
             self.gossips = {
