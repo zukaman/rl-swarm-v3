@@ -54,10 +54,18 @@ if [ "$CONNECT_TO_TESTNET" = "True" ]; then
     # Check if the yarn command exists; if not, install Yarn.
     source ~/.bashrc
     if ! command -v yarn > /dev/null 2>&1; then
-        echo "Yarn is not installed. Installing Yarn..."
-        curl -o- -L https://yarnpkg.com/install.sh | sh
-        echo 'export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"' >> ~/.bashrc
-        source ~/.bashrc
+        # Detect Ubuntu (including WSL Ubuntu) and install Yarn accordingly
+        if grep -qi "ubuntu" /etc/os-release 2>/dev/null || uname -r | grep -qi "microsoft"; then
+            echo "Detected Ubuntu or WSL Ubuntu. Installing Yarn via apt..."
+            curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+            echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+            sudo apt update && sudo apt install -y yarn
+        else
+            echo "Yarn is not installed. Installing Yarn..."
+            curl -o- -L https://yarnpkg.com/install.sh | sh
+            echo 'export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"' >> ~/.bashrc
+            source ~/.bashrc
+        fi
     fi
     yarn install
     yarn dev > /dev/null 2>&1 & # Run in background and suppress output
@@ -75,6 +83,19 @@ if [ "$CONNECT_TO_TESTNET" = "True" ]; then
 
     ORG_ID=$(awk 'BEGIN { FS = "\"" } !/^[ \t]*[{}]/ { print $(NF - 1); exit }' modal-login/temp-data/userData.json)
     echo "Your ORG_ID is set to: $ORG_ID"
+
+    # Wait until the API key is activated by the client
+    echo "Waiting for API key to become activated..."
+    while true; do
+        STATUS=$(curl -s "http://localhost:3000/api/get-api-key-status?orgId=$ORG_ID")
+        if [[ "$STATUS" == "activated" ]]; then
+            echo "API key is activated! Proceeding..."
+            break
+        else
+            echo "Waiting for API key to be activated..."
+            sleep 5
+        fi
+    done
 
     # Function to clean up the server process
     cleanup() {
