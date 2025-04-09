@@ -172,7 +172,7 @@ class Cache:
                 }
 
                 # Convert to RewardsMessage format and send to Kinesis
-                self._send_rewards_to_kinesis(sorted_leaders, curr_round, curr_stage)
+                # self._send_rewards_to_kinesis(sorted_leaders, curr_round, curr_stage)
 
                 return self.leaderboard_v2
 
@@ -369,7 +369,7 @@ class Cache:
                 elapsed,
             )
 
-        self._send_gossip_to_kinesis(round_gossip)
+        # self._send_gossip_to_kinesis(round_gossip)
 
         with self.lock:
             self.gossips = {

@@ -19,6 +19,7 @@ from hivemind_exp.name_utils import *
 
 from . import global_dht
 from .kinesis import Kinesis
+from .dht_pub import RewardsDHTPublisher, GossipDHTPublisher
 
 # UI is served from the filesystem
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -289,6 +290,25 @@ def main(args):
     thread = Thread(target=populate_cache)
     thread.daemon = True
     thread.start()
+
+    # Start publishing to kinesis. This will eventually replace the populate_cache thread.
+    logger.info("Starting rewards publisher")
+    rewards_publisher = RewardsDHTPublisher(
+        dht=global_dht.dht,
+        kinesis_client=kinesis_client,
+        logger=logger,
+        poll_interval_seconds=300,  # 5 minute
+    )
+    rewards_publisher.start()
+
+    logger.info("Starting gossip publisher")
+    gossip_publisher = GossipDHTPublisher(
+        dht=global_dht.dht,
+        kinesis_client=kinesis_client,
+        logger=logger,
+        poll_interval_seconds=150,  # 2.5 minute
+    )
+    gossip_publisher.start()
 
     logger.info(f"initializing server on port {port}")
     server.run()
