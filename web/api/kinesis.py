@@ -88,7 +88,7 @@ class Kinesis:
         """Put a record to Kinesis stream"""
         # No-op if no stream name was provided
         if not self.kinesis:
-            self.logger.debug(f"No-op: Would put record to Kinesis with partition key: {partition_key}")
+            self.logger.debug(f"No-op: received record {data} with partition key {partition_key}")
             return
             
         try:
