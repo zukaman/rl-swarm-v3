@@ -297,6 +297,7 @@ def main(args):
         dht=global_dht.dht,
         kinesis_client=kinesis_client,
         logger=logger,
+        coordinator=coordinator,
         poll_interval_seconds=300,  # 5 minute
     )
     rewards_publisher.start()
@@ -306,6 +307,7 @@ def main(args):
         dht=global_dht.dht,
         kinesis_client=kinesis_client,
         logger=logger,
+        coordinator=coordinator,
         poll_interval_seconds=150,  # 2.5 minute
     )
     gossip_publisher.start()

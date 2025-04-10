@@ -159,7 +159,7 @@ class RewardsDHTPublisher(BaseDHTPublisher):
                 self.logger.debug(f"No round/stage change: {new_round}/{new_stage}")
                 
         except Exception as e:
-            self.logger.error(f"Error polling for round/stage: {e}")
+            self.logger.error(f"Error polling for round/stage in rewards: {e}")
 
 
     def _publish_rewards(self, round_num: int, stage_num: int):
@@ -313,7 +313,7 @@ class GossipDHTPublisher(BaseDHTPublisher):
             self._publish_gossip(round_gossip)
                 
         except Exception as e:
-            self.logger.error(f"Error polling for round/stage: {e}")
+            self.logger.error(f"Error polling for round/stage in gossip: {e}")
     
     def _publish_gossip(self, gossip: list[tuple[float, dict[str, Any]]]):
         """
