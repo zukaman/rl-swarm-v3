@@ -195,7 +195,7 @@ class TestRewardsDHTPublisher(unittest.TestCase):
         self.assertEqual(actual_message.data[1].stage, stage_num)
         
         # Check that the logger was called
-        self.mock_logger.info.assert_any_call(f"Publishing rewards for round {round_num}, stage {stage_num}")
+        self.mock_logger.info.assert_any_call(f"Publishing round {round_num}, stage {stage_num} rewards for 2 peers: [('peer_id_1', 'name1', 0.5), ('peer_id_2', 'name2', 0.3)]")
         self.mock_logger.info.assert_any_call(f"Successfully published rewards for round {round_num}, stage {stage_num}")
 
     def test_publish_rewards_no_data(self):

@@ -267,12 +267,6 @@ class Cache:
                             -100:
                         ]
                     )
-                    self.logger.info(
-                        ">>> id: %s, past_scores length: %d, next_scores length: %d",
-                        id,
-                        len(past_scores),
-                        len(next_scores),
-                    )
                     self.rewards_history[id] = next_scores
                     current_history.append(
                         {

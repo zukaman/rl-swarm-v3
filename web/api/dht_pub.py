@@ -178,10 +178,11 @@ class RewardsDHTPublisher(BaseDHTPublisher):
                 self.logger.warning(f"No rewards data found for round {round_num}, stage {stage_num}")
                 return
             
-            self.logger.info(f"Publishing rewards for round {round_num}, stage {stage_num}")
-            
             # Convert rewards data to RewardsMessage format
             rewards_message = self._create_rewards_message(rewards_data, round_num, stage_num)
+
+            peer_rewards = [(data.peer_id, data.peer_name, data.amount) for data in rewards_message.data]
+            self.logger.info(f"Publishing round {round_num}, stage {stage_num} rewards for {len(peer_rewards)} peers: {peer_rewards}")
             
             # Publish to Kinesis
             self.kinesis_client.put_rewards(rewards_message)
