@@ -354,13 +354,15 @@ class Cache:
                     sorted_outputs = sorted(
                         list(outputs.items()), key=lambda t: t[1][0]
                     )
-                    for question, (ts, outputs) in sorted_outputs:
+                    for q_hash, (ts, outputs) in sorted_outputs:
+                        # Generate a unique-ish ID for each message
                         gossip_id = hashlib.md5(
-                            f"{node_key}_{r}_{s}_{question}".encode()
+                            f"{node_key}_{r}_{s}_{q_hash}".encode()
                         ).hexdigest()
+
                         if s < len(STAGE_MESSAGE_FNS):
                             message = STAGE_MESSAGE_FNS[s](
-                                node_key, question, ts, outputs
+                                node_key, outputs["question"], ts, outputs
                             )
                         else:
                             message = f"Cannot render output for unknown stage {s}"
