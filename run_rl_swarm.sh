@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # General arguments
 ROOT=$PWD
 
@@ -28,12 +30,35 @@ HOST_MULTI_ADDRS=${HOST_MULTI_ADDRS:-$DEFAULT_HOST_MULTI_ADDRS}
 DEFAULT_IDENTITY_PATH="$ROOT"/swarm.pem
 IDENTITY_PATH=${IDENTITY_PATH:-$DEFAULT_IDENTITY_PATH}
 
+# Will ignore any visible GPUs if set.
+CPU_ONLY=${CPU_ONLY:-""}
+
+# Set if successfully parsed from modal-login/temp-data/userData.json.
+ORG_ID=${ORG_ID:-""}
+
 GREEN_TEXT="\033[32m"
 RESET_TEXT="\033[0m"
 
 echo_green() {
     echo -e "$GREEN_TEXT$1$RESET_TEXT"
 }
+
+ROOT_DIR="$(cd $(dirname ${BASH_SOURCE[0]}) && pwd)"
+
+# Function to clean up the server process upon exit
+cleanup() {
+    echo_green ">> Shutting down trainer..."
+
+    # Remove modal credentials if they exist
+    rm -r $ROOT_DIR/modal-login/temp-data/*.json 2> /dev/null || true
+
+    # Kill all processes belonging to this script's process group
+    kill -- -$$ || true
+
+    exit 0
+}
+
+trap cleanup EXIT
 
 while true; do
     echo -en $GREEN_TEXT
@@ -55,7 +80,7 @@ if [ "$CONNECT_TO_TESTNET" = "True" ]; then
     source ~/.bashrc
     if ! command -v yarn > /dev/null 2>&1; then
         # Detect Ubuntu (including WSL Ubuntu) and install Yarn accordingly
-        if grep -qi "ubuntu" /etc/os-release 2>/dev/null || uname -r | grep -qi "microsoft"; then
+        if grep -qi "ubuntu" /etc/os-release 2> /dev/null || uname -r | grep -qi "microsoft"; then
             echo "Detected Ubuntu or WSL Ubuntu. Installing Yarn via apt..."
             curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
             echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
@@ -71,6 +96,7 @@ if [ "$CONNECT_TO_TESTNET" = "True" ]; then
     yarn dev > /dev/null 2>&1 & # Run in background and suppress output
 
     SERVER_PID=$!  # Store the process ID
+    echo "Started server process: $SERVER_PID"
     sleep 5
     open http://localhost:3000
     cd ..
@@ -96,17 +122,6 @@ if [ "$CONNECT_TO_TESTNET" = "True" ]; then
             sleep 5
         fi
     done
-
-    # Function to clean up the server process
-    cleanup() {
-        echo_green ">> Shutting down server..."
-        kill $SERVER_PID
-        rm -r modal-login/temp-data/*.json
-        exit 0
-    }
-
-    # Set up trap to catch Ctrl+C and call cleanup
-    trap cleanup INT
 fi
 
 pip_install() {
@@ -131,6 +146,7 @@ fi
 
 echo_green ">> Done!"
 
+HF_TOKEN=${HF_TOKEN:-""}
 if [ -n "${HF_TOKEN}" ]; then # Check if HF_TOKEN is already set and use if so. Else give user a prompt to choose.
     HUGGINGFACE_ACCESS_TOKEN=${HF_TOKEN}
 else
