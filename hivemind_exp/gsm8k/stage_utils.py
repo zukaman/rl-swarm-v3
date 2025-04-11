@@ -44,7 +44,7 @@ def merged_prev_stage_datasets(
     # Retrieves and merges last stage samples locally and from DHT.
     def get_prev_rewards():
         return get_dht_value(
-            dht, key=rewards_key(r, s - 1), latest=True, beam_size=1000
+            dht, key=rewards_key(r, s - 1), beam_size=100
         )
 
     prev_rewards: dict[str, Any] | None = get_prev_rewards()

@@ -97,10 +97,14 @@ class Cache:
         # Basically a proxy for the reachable peer group.
         curr_round = self.current_round.value
         curr_stage = self.current_stage.value
-        return self._get_dht_value(key=rewards_key(curr_round, curr_stage))
+        return self._get_dht_value(
+            key=rewards_key(curr_round, curr_stage), beam_size=500
+        )
 
     def _previous_rewards(self):
-        return self._get_dht_value(key=rewards_key(*self._previous_round_and_stage()))
+        return self._get_dht_value(
+            key=rewards_key(*self._previous_round_and_stage()), beam_size=500
+        )
 
     def _get_leaderboard_v2(self):
         try:

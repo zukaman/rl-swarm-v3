@@ -104,7 +104,7 @@ class BaseDHTPublisher(ABC):
         self, round_num: int, stage_num: int
     ) -> dict[str, Any] | None:
         rewards_key_str = rewards_key(round_num, stage_num)
-        rewards_data = get_dht_value(self.dht, key=rewards_key_str)
+        rewards_data = get_dht_value(self.dht, key=rewards_key_str, beam_size=500)
         return rewards_data
 
     def _get_outputs_data(
