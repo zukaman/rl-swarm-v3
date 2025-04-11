@@ -30,6 +30,7 @@ class DummySwarmCoordinator(SwarmCoordinator):
     def get_round_and_stage(self):
         return 3, 0
 
+
 class TestServer(unittest.TestCase):
     def setUp(self):
         global_dht.setup_global_dht([], DummySwarmCoordinator(), logger)
@@ -111,7 +112,10 @@ class TestServer(unittest.TestCase):
                 ("deadly energetic raven", "best dairy?...Answer: rocks"),  # stage 0
                 ("deadly energetic raven", "idk...Identify: Student #1"),  # stage 1
                 ("deadly energetic raven", "bad job...Majority: Student #1"),  # stage 2
-                ("freckled snorting raccoon", "best dairy?...Answer: cheese"),  # stage 0 fallback
+                (
+                    "freckled snorting raccoon",
+                    "best dairy?...Answer: cheese",
+                ),  # stage 0 fallback
             },
         )
 
