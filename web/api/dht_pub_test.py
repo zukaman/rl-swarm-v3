@@ -1,10 +1,13 @@
 import unittest
 from unittest.mock import MagicMock, patch, call
+import logging
 import time
 from datetime import datetime, timezone
 import threading
 import sys
 from pathlib import Path
+import json
+from pythonjsonlogger import jsonlogger
 
 # Add the parent directory to the Python path
 parent_dir = Path(__file__).parent.parent
@@ -18,15 +21,28 @@ from web.api.dht_pub import BaseDHTPublisher, RewardsDHTPublisher, GossipDHTPubl
 from web.api.kinesis import RewardsMessage, RewardsMessageData
 
 
-class TestRewardsDHTPublisher(unittest.TestCase):
+class TestRewardsDHTPublisher():
     """Tests for the RewardsDHTPublisher class."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
         # Create mock objects
         self.mock_dht = MagicMock()
         self.mock_kinesis = MagicMock()
-        self.mock_logger = MagicMock()
+        
+        # Create a real logger for testing
+        self.mock_logger = logging.getLogger("test_logger")
+        self.mock_logger.setLevel(logging.INFO)
+        
+        # Add a handler to the logger so caplog can capture the logs
+        handler = logging.StreamHandler()
+        handler.setLevel(logging.INFO)
+        
+        # Use the JSON formatter from python-json-logger
+        json_formatter = jsonlogger.JsonFormatter('%(asctime)s %(levelname)s %(message)s %(extra)s')
+        handler.setFormatter(json_formatter)
+        self.mock_logger.addHandler(handler)
+        
         self.coordinator = MagicMock()
         
         # Create the publisher with a short poll interval for testing
@@ -38,7 +54,8 @@ class TestRewardsDHTPublisher(unittest.TestCase):
             coordinator=self.coordinator
         )
 
-    def tearDown(self):
+
+    def teardown_method(self):
         """Clean up after tests."""
         # Stop the publisher if it's running
         if self.publisher.running:
@@ -46,23 +63,38 @@ class TestRewardsDHTPublisher(unittest.TestCase):
             # Give it a moment to stop
             time.sleep(0.2)
 
-    def test_initialization(self):
-        """Test that the publisher initializes correctly."""
-        self.assertEqual(self.publisher.dht, self.mock_dht)
-        self.assertEqual(self.publisher.kinesis_client, self.mock_kinesis)
-        self.assertEqual(self.publisher.logger, self.mock_logger)
-        self.assertEqual(self.publisher.coordinator, self.coordinator)
-        self.assertEqual(self.publisher.poll_interval_seconds, 0.1)
-        self.assertEqual(self.publisher.current_round, -1)
-        self.assertEqual(self.publisher.current_stage, -1)
-        self.assertIsNone(self.publisher.last_polled)
-        self.assertFalse(self.publisher.running)
-        self.assertIsNone(self.publisher._poll_thread)
-        
-        # Check that the logger was called
-        self.mock_logger.info.assert_called_once_with("RewardsDHTPublisher initialized")
 
-    def test_poll_once_no_change(self):
+    def test_initialization(self, caplog):
+        """Test that the publisher initializes correctly."""
+        # Set the caplog level to capture INFO messages
+        caplog.set_level(logging.INFO)
+        
+        # Re-initialize the publisher to capture the logs
+        self.publisher = RewardsDHTPublisher(
+            dht=self.mock_dht,
+            kinesis_client=self.mock_kinesis,
+            logger=self.mock_logger,
+            poll_interval_seconds=0.1,
+            coordinator=self.coordinator
+        )
+        
+        # Verify the log message was captured
+        assert len(caplog.records) > 0
+        assert caplog.records[0].message == "RewardsDHTPublisher initialized"
+        
+        # Verify other properties
+        assert self.publisher.dht == self.mock_dht
+        assert self.publisher.kinesis_client == self.mock_kinesis
+        assert self.publisher.coordinator == self.coordinator
+        assert self.publisher.poll_interval_seconds == 0.1
+        assert self.publisher.current_round == -1
+        assert self.publisher.current_stage == -1
+        assert self.publisher.last_polled == None
+        assert self.publisher.running == False
+        assert self.publisher._poll_thread == None
+
+
+    def test_poll_once_no_change(self, caplog):
         """Test polling when there's no round/stage change."""
         # Set up the coordinator mock to return the same round/stage
         self.coordinator.get_round_and_stage.return_value = (1, 1)
@@ -76,17 +108,20 @@ class TestRewardsDHTPublisher(unittest.TestCase):
         self.coordinator.get_round_and_stage.assert_called_once()
         
         # Check that the round/stage didn't change
-        self.assertEqual(self.publisher.current_round, 1)
-        self.assertEqual(self.publisher.current_stage, 1)
+        assert self.publisher.current_round == 1
+        assert self.publisher.current_stage == 1
         
         # Check that the logger was called
-        self.mock_logger.info.assert_any_call("Polled for round/stage: round=1, stage=1")
-        self.mock_logger.debug.assert_any_call("No round/stage change: 1/1")
+        assert len(caplog.records) > 0
+        assert caplog.records[0].message == "Polled for round/stage"
+        assert caplog.records[0].round == 1
+        assert caplog.records[0].stage == 1
         
         # Check that last_polled was updated
-        self.assertIsNotNone(self.publisher.last_polled)
+        assert self.publisher.last_polled is not None
 
-    def test_poll_once_with_change(self):
+
+    def test_poll_once_with_change(self, caplog):
         """Test polling when there's a round/stage change."""
         # Set up the coordinator mock to return a different round/stage
         self.coordinator.get_round_and_stage.return_value = (2, 1)
@@ -103,8 +138,8 @@ class TestRewardsDHTPublisher(unittest.TestCase):
         self.coordinator.get_round_and_stage.assert_called_once()
         
         # Check that the round/stage changed
-        self.assertEqual(self.publisher.current_round, 2)
-        self.assertEqual(self.publisher.current_stage, 1)
+        assert self.publisher.current_round == 2
+        assert self.publisher.current_stage == 1
         
         # Check that _publish_rewards was called for old round/stage
         self.publisher._publish_rewards.assert_has_calls([
@@ -112,13 +147,22 @@ class TestRewardsDHTPublisher(unittest.TestCase):
         ])
         
         # Check that the logger was called
-        self.mock_logger.info.assert_any_call("Polled for round/stage: round=2, stage=1")
-        self.mock_logger.info.assert_any_call("Round/stage changed: 1/1 -> 2/1")
+        assert len(caplog.records) > 0
+        assert caplog.records[0].message == "Polled for round/stage"
+        assert caplog.records[0].round == 2
+        assert caplog.records[0].stage == 1
+
+        assert caplog.records[1].message == "Round or stage changed"
+        assert caplog.records[1].old_round == 1
+        assert caplog.records[1].old_stage == 1
+        assert caplog.records[1].new_round == 2
+        assert caplog.records[1].new_stage == 1
         
         # Check that last_polled was updated
-        self.assertIsNotNone(self.publisher.last_polled)
+        assert self.publisher.last_polled is not None
 
-    def test_poll_once_error(self):
+
+    def test_poll_once_error(self, caplog):
         """Test polling when there's an error."""
         # Set up the coordinator mock to raise an exception
         self.coordinator.get_round_and_stage.side_effect = Exception("Test error")
@@ -130,16 +174,19 @@ class TestRewardsDHTPublisher(unittest.TestCase):
         self.coordinator.get_round_and_stage.assert_called_once()
         
         # Check that the round/stage didn't change
-        self.assertEqual(self.publisher.current_round, -1)
-        self.assertEqual(self.publisher.current_stage, -1)
+        assert self.publisher.current_round == -1
+        assert self.publisher.current_stage == -1
         
         # Check that the logger was called with the error
-        self.mock_logger.error.assert_called_once_with("Error polling for round/stage: Test error")
+        assert len(caplog.records) > 0
+        assert caplog.records[0].message == "Error polling for round/stage in rewards"
+        assert caplog.records[0].error == "Test error"
         
         # Check that last_polled was not updated
-        self.assertIsNone(self.publisher.last_polled)
+        assert self.publisher.last_polled is None
 
-    def test_publish_rewards(self):
+
+    def test_publish_rewards(self, caplog):
         """Test publishing rewards."""
         # Set up test data
         round_num = 1
@@ -175,30 +222,34 @@ class TestRewardsDHTPublisher(unittest.TestCase):
         actual_message = self.publisher.kinesis_client.put_rewards.call_args[0][0]
         
         # Check that the message has the correct type
-        self.assertEqual(actual_message.type, "rewards")
+        assert actual_message.type == "rewards"
         
         # Check that the message has the correct data
-        self.assertEqual(len(actual_message.data), 2)
+        assert len(actual_message.data) == 2
         
         # Check the first data item
-        self.assertEqual(actual_message.data[0].peer_id, "peer_id_1")
-        self.assertEqual(actual_message.data[0].peer_name, "name1")
-        self.assertEqual(actual_message.data[0].amount, 0.5)
-        self.assertEqual(actual_message.data[0].round, round_num)
-        self.assertEqual(actual_message.data[0].stage, stage_num)
+        assert actual_message.data[0].peer_id == "peer_id_1"
+        assert actual_message.data[0].peer_name == "name1"
+        assert actual_message.data[0].amount == 0.5
+        assert actual_message.data[0].round == round_num
+        assert actual_message.data[0].stage == stage_num
         
         # Check the second data item
-        self.assertEqual(actual_message.data[1].peer_id, "peer_id_2")
-        self.assertEqual(actual_message.data[1].peer_name, "name2")
-        self.assertEqual(actual_message.data[1].amount, 0.3)
-        self.assertEqual(actual_message.data[1].round, round_num)
-        self.assertEqual(actual_message.data[1].stage, stage_num)
+        assert actual_message.data[1].peer_id == "peer_id_2"
+        assert actual_message.data[1].peer_name == "name2"
+        assert actual_message.data[1].amount == 0.3
+        assert actual_message.data[1].round == round_num
+        assert actual_message.data[1].stage == stage_num
         
         # Check that the logger was called
-        self.mock_logger.info.assert_any_call(f"Publishing round {round_num}, stage {stage_num} rewards for 2 peers: [('peer_id_1', 'name1', 0.5), ('peer_id_2', 'name2', 0.3)]")
-        self.mock_logger.info.assert_any_call(f"Successfully published rewards for round {round_num}, stage {stage_num}")
+        assert len(caplog.records) > 0
+        assert caplog.records[0].message == "Publishing rewards"
+        assert caplog.records[0].round == round_num
+        assert caplog.records[0].stage == stage_num
+        assert caplog.records[0].num_peers == 2
 
-    def test_publish_rewards_no_data(self):
+
+    def test_publish_rewards_no_data(self, caplog):
         """Test publishing rewards when there's no data."""
         # Set up test data
         round_num = 1
@@ -213,16 +264,20 @@ class TestRewardsDHTPublisher(unittest.TestCase):
         self.publisher._publish_rewards(round_num, stage_num)
         
         # Check that _create_rewards_message was not called
-        self.assertEqual(self.publisher._create_rewards_message.call_count, 0)
+        assert self.publisher._create_rewards_message.call_count == 0
         
         # Check that put_rewards was not called
-        self.assertEqual(self.mock_kinesis.put_rewards.call_count, 0)
+        assert self.mock_kinesis.put_rewards.call_count == 0
         
         # Check that the logger was called
-        self.mock_logger.warning.assert_called_once_with(f"No rewards data found for round {round_num}, stage {stage_num}")
+        assert len(caplog.records) > 0
+        assert caplog.records[0].message == "No rewards data for round, stage"
+        assert caplog.records[0].round == round_num
+        assert caplog.records[0].stage == stage_num
+
 
     @patch('web.api.dht_pub.get_name_from_peer_id')
-    def test_create_rewards_message(self, mock_get_name):
+    def test_create_rewards_message(self, mock_get_name, caplog):
         """Test creating a rewards message."""
         # Set up test data
         round_num = 1
@@ -239,40 +294,52 @@ class TestRewardsDHTPublisher(unittest.TestCase):
         message = self.publisher._create_rewards_message(rewards_data, round_num, stage_num)
         
         # Check that the message is a RewardsMessage
-        self.assertIsInstance(message, RewardsMessage)
+        assert isinstance(message, RewardsMessage)
         
         # Check that the message has the correct type
-        self.assertEqual(message.type, "rewards")
+        assert message.type == "rewards"
         
         # Check that the message has the correct data
-        self.assertEqual(len(message.data), 2)
+        assert len(message.data) == 2
         
         # Check the first data item
-        self.assertIsInstance(message.data[0], RewardsMessageData)
-        self.assertEqual(message.data[0].peer_id, "peer_id_1")
-        self.assertEqual(message.data[0].peer_name, "name1")
-        self.assertEqual(message.data[0].amount, 0.5)
-        self.assertEqual(message.data[0].round, round_num)
-        self.assertEqual(message.data[0].stage, stage_num)
+        assert isinstance(message.data[0], RewardsMessageData)
+        assert message.data[0].peer_id == "peer_id_1"
+        assert message.data[0].peer_name == "name1"
+        assert message.data[0].amount == 0.5
+        assert message.data[0].round == round_num
+        assert message.data[0].stage == stage_num
         
         # Check the second data item
-        self.assertIsInstance(message.data[1], RewardsMessageData)
-        self.assertEqual(message.data[1].peer_id, "peer_id_2")
-        self.assertEqual(message.data[1].peer_name, "name2")
-        self.assertEqual(message.data[1].amount, 0.3)
-        self.assertEqual(message.data[1].round, round_num)
-        self.assertEqual(message.data[1].stage, stage_num)
+        assert isinstance(message.data[1], RewardsMessageData)
+        assert message.data[1].peer_id == "peer_id_2"
+        assert message.data[1].peer_name == "name2"
+        assert message.data[1].amount == 0.3
+        assert message.data[1].round == round_num
+        assert message.data[1].stage == stage_num
 
-
-class TestGossipDHTPublisher(unittest.TestCase):
+class TestGossipDHTPublisher():
     """Tests for the GossipDHTPublisher class."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
         # Create mock objects
         self.mock_dht = MagicMock()
         self.mock_kinesis = MagicMock()
-        self.mock_logger = MagicMock()
+        
+        # Create a real logger for testing
+        self.mock_logger = logging.getLogger("test_logger")
+        self.mock_logger.setLevel(logging.INFO)
+        
+        # Add a handler to the logger so caplog can capture the logs
+        handler = logging.StreamHandler()
+        handler.setLevel(logging.INFO)
+        
+        # Use the JSON formatter from python-json-logger
+        json_formatter = jsonlogger.JsonFormatter('%(asctime)s %(levelname)s %(message)s %(extra)s')
+        handler.setFormatter(json_formatter)
+        self.mock_logger.addHandler(handler)
+        
         self.coordinator = MagicMock()
         
         # Create the publisher with a short poll interval for testing
@@ -284,7 +351,7 @@ class TestGossipDHTPublisher(unittest.TestCase):
             coordinator=self.coordinator
         )
 
-    def tearDown(self):
+    def teardown_method(self):
         """Clean up after tests."""
         # Stop the publisher if it's running
         if self.publisher.running:
@@ -292,23 +359,37 @@ class TestGossipDHTPublisher(unittest.TestCase):
             # Give it a moment to stop
             time.sleep(0.2)
 
-    def test_initialization(self):
+    def test_initialization(self, caplog):
         """Test that the publisher initializes correctly."""
-        self.assertEqual(self.publisher.dht, self.mock_dht)
-        self.assertEqual(self.publisher.kinesis_client, self.mock_kinesis)
-        self.assertEqual(self.publisher.logger, self.mock_logger)
-        self.assertEqual(self.publisher.coordinator, self.coordinator)
-        self.assertEqual(self.publisher.poll_interval_seconds, 0.1)
-        self.assertEqual(self.publisher.current_round, -1)
-        self.assertEqual(self.publisher.current_stage, -1)
-        self.assertIsNone(self.publisher.last_polled)
-        self.assertFalse(self.publisher.running)
-        self.assertIsNone(self.publisher._poll_thread)
+        # Set the caplog level to capture INFO messages
+        caplog.set_level(logging.INFO)
         
-        # Check that the logger was called
-        self.mock_logger.info.assert_called_once_with("GossipDHTPublisher initialized")
+        # Re-initialize the publisher to capture the logs
+        self.publisher = GossipDHTPublisher(
+            dht=self.mock_dht,
+            kinesis_client=self.mock_kinesis,
+            logger=self.mock_logger,
+            poll_interval_seconds=0.1,
+            coordinator=self.coordinator
+        )
+        
+        # Verify the log message was captured
+        assert len(caplog.records) > 0
+        assert caplog.records[0].message == "GossipDHTPublisher initialized"
+        
+        # Verify other properties
+        assert self.publisher.dht == self.mock_dht
+        assert self.publisher.kinesis_client == self.mock_kinesis
+        assert self.publisher.coordinator == self.coordinator
+        assert self.publisher.poll_interval_seconds == 0.1
+        assert self.publisher.current_round == -1
+        assert self.publisher.current_stage == -1
+        assert self.publisher.last_polled is None
+        assert self.publisher.running is False
+        assert self.publisher._poll_thread is None
 
-    def test_poll_once_no_rewards(self):
+
+    def test_poll_once_no_rewards(self, caplog):
         """Test gossip polling when there's no rewards data."""
 
         # Set up mocks
@@ -322,10 +403,16 @@ class TestGossipDHTPublisher(unittest.TestCase):
         self.coordinator.get_round_and_stage.assert_called_once()
         
         # Check that the logger was called
-        self.mock_logger.error.assert_any_call("Error polling for round/stage: missing rewards")
+        assert len(caplog.records) > 0
+        assert caplog.records[0].message == "Error polling for round/stage in gossip"
+        assert caplog.records[0].error == "missing rewards"
 
-    def test_poll_once_with_rewards(self):
+
+    def test_poll_once_with_rewards(self, caplog):
         """Test gossip polling when there is rewards data."""
+        # Set the caplog level to capture INFO messages
+        caplog.set_level(logging.INFO)
+        
         # Set up mocks
         self.coordinator.get_round_and_stage.return_value = (1, 1)
         rewards_data = {"peer_id_1": 0.5, "peer_id_2": 0.3}
@@ -350,14 +437,23 @@ class TestGossipDHTPublisher(unittest.TestCase):
         self.mock_kinesis.put_gossip.assert_not_called()
         
         # Check that the logger was called
-        self.mock_logger.info.assert_any_call("Polled for round/stage: round=1, stage=1")
-        self.mock_logger.info.assert_any_call("Publishing 0 gossip messages")
+        assert len(caplog.records) > 0
+        assert caplog.records[0].message == "Polled for round/stage"
+        assert caplog.records[0].round == 1
+        assert caplog.records[0].stage == 1
+
+        assert caplog.records[1].message == "Publishing gossip messages"
+        assert caplog.records[1].num_messages == 0
         
         # Check that last_polled was updated
-        self.assertIsNotNone(self.publisher.last_polled)
+        assert self.publisher.last_polled is not None
 
-    def test_poll_once_error(self):
+
+    def test_poll_once_error(self, caplog):
         """Test polling when there's an error."""
+        # Set the caplog level to capture ERROR messages
+        caplog.set_level(logging.ERROR)
+        
         # Set up the coordinator mock to raise an exception
         self.coordinator.get_round_and_stage.side_effect = Exception("Test error")
         
@@ -368,13 +464,19 @@ class TestGossipDHTPublisher(unittest.TestCase):
         self.coordinator.get_round_and_stage.assert_called_once()
         
         # Check that the logger was called with the error
-        self.mock_logger.error.assert_called_once_with("Error polling for round/stage: Test error")
+        assert len(caplog.records) > 0
+        assert caplog.records[0].message == "Error polling for round/stage in gossip"
+        assert caplog.records[0].error == "Test error"
         
         # Check that last_polled was not updated
-        self.assertIsNone(self.publisher.last_polled)
+        assert self.publisher.last_polled is None
 
-    def test_publish_gossip(self):
+
+    def test_publish_gossip(self, caplog):
         """Test publishing gossip data."""
+        # Set the caplog level to capture INFO messages
+        caplog.set_level(logging.INFO)
+        
         # Set up test data
         gossip = [
             (1000.0, {"id": "id1", "message": "message1", "node": "node1", "nodeId": "peer_id_1"}),
@@ -391,9 +493,8 @@ class TestGossipDHTPublisher(unittest.TestCase):
         self.mock_kinesis.put_gossip.assert_called_once()
         
         # Check that the logger was called
-        self.mock_logger.info.assert_any_call("Publishing 2 gossip messages")
-        self.mock_logger.info.assert_any_call("Successfully published gossip")
+        assert len(caplog.records) > 0
+        assert caplog.records[0].message == "Publishing gossip messages"
+        assert caplog.records[0].num_messages == 2
 
-
-if __name__ == '__main__':
-    unittest.main() 
+        assert caplog.records[1].message == "Successfully published gossip"

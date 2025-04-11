@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException, Request, Response, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import json
+from pythonjsonlogger import jsonlogger
 
 from hivemind_exp.dht_utils import *
 from hivemind_exp.name_utils import *
@@ -36,11 +37,28 @@ async def load_index_html():
             index_html = await f.read()
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
+class CustomJsonFormatter(jsonlogger.JsonFormatter):
+    def add_fields(self, log_record, record, message):
+        # Ensure that 'extra' fields are included in the log record
+        super().add_fields(log_record, record, message)
+        
+        # Include both adapter extra fields and log call extra fields
+        if hasattr(record, 'extra_fields'):
+            for key, value in record.extra_fields.items():
+                log_record[key] = value
+
+json_formatter = CustomJsonFormatter(
+    '%(asctime)s %(levelname)s %(message)s'
 )
 
+# Configure the root logger
+root_logger = logging.getLogger()
+handler = logging.StreamHandler()
+handler.setFormatter(json_formatter)
+root_logger.addHandler(handler)
+root_logger.setLevel(logging.INFO)
+
+# Get the module logger
 logger = logging.getLogger(__name__)
 
 app = FastAPI()

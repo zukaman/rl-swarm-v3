@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple
 import random
 from abc import ABC, abstractmethod
+import uuid
 
 from hivemind.dht import DHT
 from hivemind_exp.dht_utils import get_dht_value, rewards_key, outputs_key
@@ -57,34 +58,38 @@ class BaseDHTPublisher(ABC):
         self.current_round = -1
         self.current_stage = -1
         self.last_polled = None
+        self.poll_id = None
         
-        self.logger.info(f"{self.__class__.__name__} initialized")
+        # Store the class name for use in logging
+        self.class_name = self.__class__.__name__
+        
+        self.logger.info(f"{self.class_name} initialized")
     
 
     def start(self):
         """Start the polling thread."""
         if self._poll_thread:
-            self.logger.warning(f"{self.__class__.__name__} is already running")
+            self.logger.warning(f"{self.class_name} is already running")
             return
 
-        self.logger.info(f"{self.__class__.__name__} starting")
+        self.logger.info(f"{self.class_name} starting")
         
         self._poll_thread = threading.Thread(target=self._poll_loop, daemon=True)
         self._poll_thread.start()
         self.running = True
-        self.logger.info(f"{self.__class__.__name__} started")
+        self.logger.info(f"{self.class_name} started")
     
 
     def stop(self):
         """Stop the polling thread."""
         if not self._poll_thread:
-            self.logger.warning(f"{self.__class__.__name__} is not running")
+            self.logger.warning(f"{self.class_name} is not running")
             return
         
         self._stop_event.set()
         self._poll_thread.join(timeout=5)
         self.running = False
-        self.logger.info(f"{self.__class__.__name__} stopped")
+        self.logger.info(f"{self.class_name} stopped")
     
 
     def get_last_polled(self):
@@ -112,7 +117,14 @@ class BaseDHTPublisher(ABC):
         """Main polling loop."""
 
         while not self._stop_event.is_set():
-            self.logger.info(f"Polling for round/stage: class={self.__class__.__name__}, round={self.current_round}, stage={self.current_stage}")
+            self.poll_id = str(uuid.uuid4())
+
+            self.logger.info("Polling for round/stage", extra={
+                "class": self.class_name,
+                "round": self.current_round,
+                "stage": self.current_stage,
+                "poll_id": self.poll_id
+            })
             self._poll_once()
             time.sleep(self.poll_interval_seconds)
     
@@ -131,35 +143,65 @@ class RewardsDHTPublisher(BaseDHTPublisher):
     A class that polls the DHT for round and stage changes, and publishes rewards data to Kinesis.
     """
     
+    def __init__(self, dht: DHT, kinesis_client, logger=None, poll_interval_seconds: int = 300, coordinator=None):
+        """Initialize the publisher."""
+        super().__init__(dht, kinesis_client, logger, poll_interval_seconds, coordinator=coordinator)
+    
     def _poll_once(self):
         """Perform a single poll of the DHT for rewards data."""
         try:
             new_round, new_stage = self.coordinator.get_round_and_stage()
                 
-            self.logger.info(f"Polled for round/stage: round={new_round}, stage={new_stage}")
+            self.logger.info("Polled for round/stage", extra={
+                "class": self.class_name,
+                "round": new_round,
+                "stage": new_stage,
+                "poll_id": self.poll_id
+            })
             
             # Update the last polled time
             self.last_polled = datetime.now(timezone.utc)
             
             # Check if round/stage has changed
             if new_round != self.current_round or new_stage != self.current_stage:
-                self.logger.info(f"Round/stage changed: {self.current_round}/{self.current_stage} -> {new_round}/{new_stage}")
+                self.logger.info("Round or stage changed", extra={
+                    "class": self.class_name,
+                    "old_round": self.current_round,
+                    "old_stage": self.current_stage,
+                    "new_round": new_round,
+                    "new_stage": new_stage,
+                    "poll_id": self.poll_id
+                })
                 
                 # If we have a previous round/stage, publish its rewards
                 if self.current_round >= 0 and self.current_stage >= 0:
-                    self.logger.info(f"Found rewards for {self.current_round}/{self.current_stage}, publishing")
+                    self.logger.info("Found rewards for current round/stage, publishing", extra={
+                        "class": self.class_name,
+                        "round": self.current_round,
+                        "stage": self.current_stage,
+                        "poll_id": self.poll_id
+                    })
                     self._publish_rewards(self.current_round, self.current_stage)
                 
                 # Update current round and stage
                 self.current_round = new_round
                 self.current_stage = new_stage
-                self.logger.info(f"Updated round/stage: {self.current_round}/{self.current_stage}")
+                self.logger.info("Updated round/stage to new values", extra={
+                    "class": self.class_name,
+                    "round": self.current_round,
+                    "stage": self.current_stage,
+                    "poll_id": self.poll_id
+                })
                 
             else:
                 self.logger.debug(f"No round/stage change: {new_round}/{new_stage}")
                 
         except Exception as e:
-            self.logger.error(f"Error polling for round/stage in rewards: {e}")
+            self.logger.error("Error polling for round/stage in rewards", extra={
+                "class": self.class_name,
+                "error": str(e),
+                "poll_id": self.poll_id
+            })
 
 
     def _publish_rewards(self, round_num: int, stage_num: int):
@@ -175,22 +217,44 @@ class RewardsDHTPublisher(BaseDHTPublisher):
             rewards_data = self._get_rewards_data(round_num, stage_num)
             
             if not rewards_data:
-                self.logger.warning(f"No rewards data found for round {round_num}, stage {stage_num}")
+                self.logger.warning("No rewards data for round, stage", extra={
+                    "class": self.class_name,
+                    "round": round_num,
+                    "stage": stage_num,
+                    "poll_id": self.poll_id
+                })
                 return
             
             # Convert rewards data to RewardsMessage format
             rewards_message = self._create_rewards_message(rewards_data, round_num, stage_num)
 
             peer_rewards = [(data.peer_id, data.peer_name, data.amount) for data in rewards_message.data]
-            self.logger.info(f"Publishing round {round_num}, stage {stage_num} rewards for {len(peer_rewards)} peers: {peer_rewards}")
+            self.logger.info("Publishing rewards", extra={
+                "class": self.class_name,
+                "round": round_num,
+                "stage": stage_num,
+                "num_peers": len(peer_rewards),
+                "peer_rewards": peer_rewards,
+                "poll_id": self.poll_id
+            })
             
             # Publish to Kinesis
             self.kinesis_client.put_rewards(rewards_message)
-            
-            self.logger.info(f"Successfully published rewards for round {round_num}, stage {stage_num}")
+
+            self.logger.info("Successfully published rewards", extra={
+                "class": self.class_name,
+                "round": round_num,
+                "stage": stage_num,
+                "poll_id": self.poll_id
+            })
             
         except Exception as e:
-            self.logger.error(f"Error publishing rewards for round {round_num}, stage {stage_num}: {e}")
+            self.logger.error("Error publishing rewards", extra={
+                "class": self.class_name,
+                "round": round_num,
+                "stage": stage_num,
+                "poll_id": self.poll_id
+            })
     
 
     def _create_rewards_message(self, rewards_data: Dict[str, Any], round_num: int, stage_num: int) -> RewardsMessage:
@@ -234,6 +298,10 @@ class GossipDHTPublisher(BaseDHTPublisher):
     A class that polls the DHT for gossip data and publishes it to Kinesis.
     """
     
+    def __init__(self, dht: DHT, kinesis_client, logger=None, poll_interval_seconds: int = 300, coordinator=None):
+        """Initialize the publisher."""
+        super().__init__(dht, kinesis_client, logger, poll_interval_seconds, coordinator=coordinator)
+    
     def _poll_once(self):
         """Perform a single poll of the DHT for gossip data."""
         MESSAGE_TARGET = 200
@@ -258,7 +326,11 @@ class GossipDHTPublisher(BaseDHTPublisher):
             node_gossip_count = defaultdict(int)
             node_gossip_limit = max(1, MESSAGE_TARGET / len(nodes))
 
-            self.logger.info(f"Polled for round/stage: round={new_round}, stage={new_stage}")
+            self.logger.info("Polled for round/stage", extra={
+                "round": new_round,
+                "stage": new_stage,
+                "poll_id": self.poll_id
+            })
 
             start_round = max(0, new_round - 3)
             
@@ -280,7 +352,6 @@ class GossipDHTPublisher(BaseDHTPublisher):
                     continue
 
                 sorted_outputs = sorted(list(outputs.items()), key=lambda t: t[1][0])
-                self.logger.info(f">>> Sorted outputs: {sorted_outputs}")
 
                 for question, (ts, outputs) in sorted_outputs:
                     # Generate a unique-ish ID for each message
@@ -313,7 +384,11 @@ class GossipDHTPublisher(BaseDHTPublisher):
             self._publish_gossip(round_gossip)
                 
         except Exception as e:
-            self.logger.error(f"Error polling for round/stage in gossip: {e}")
+            self.logger.error("Error polling for round/stage in gossip", extra={
+                "class": self.class_name,
+                "error": str(e),
+                "poll_id": self.poll_id
+            })
     
     def _publish_gossip(self, gossip: list[tuple[float, dict[str, Any]]]):
         """
@@ -323,7 +398,9 @@ class GossipDHTPublisher(BaseDHTPublisher):
             gossip_data: The gossip data from the DHT
         """
         try:
-            self.logger.info(f"Publishing {len(gossip)} gossip messages")
+            self.logger.info("Publishing gossip messages", extra={
+                "num_messages": len(gossip)
+            })
             gossip_data = []
 
             for ts, g in gossip:
@@ -340,7 +417,10 @@ class GossipDHTPublisher(BaseDHTPublisher):
             
             if len(gossip_data) > 0:
                 self.kinesis_client.put_gossip(GossipMessage(type="gossip", data=gossip_data))
-                self.logger.info(f"Successfully published gossip")
+                self.logger.info("Successfully published gossip")
             
         except Exception as e:
-            self.logger.error(f"Error publishing gossip: {e}")
+            self.logger.error("Error publishing gossip", extra={
+                "error": str(e),
+                "poll_id": self.poll_id
+            })

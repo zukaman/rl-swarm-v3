@@ -251,7 +251,7 @@ class Cache:
                 }
                 for t in raw
             ]
-            self.logger.info(">>> lb_entries length: %d", len(all_entries))
+            self.logger.info("lb_entries length: %d", len(all_entries))
 
             current_history = []
             with self.lock:
@@ -358,7 +358,7 @@ class Cache:
         finally:
             elapsed = (datetime.now() - start_time).total_seconds()
             self.logger.info(
-                ">>> completed gossip with %d messages in %.2fs",
+                "completed gossip with %d messages in %.2fs",
                 len(round_gossip),
                 elapsed,
             )
