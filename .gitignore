@@ -18,3 +18,4 @@ web/ui/dist/
 /tmp
 
 dist/
+MODULE.bazel.lock
