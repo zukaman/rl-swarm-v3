@@ -35,10 +35,10 @@ class GRPOArguments:
 
     # LoRA arguments
     use_lora: bool = False
-    lora_r: int = 16
+    lora_rank: int = 16  # Changed from lora_r to lora_rank to avoid conflicts
     lora_alpha: int = 32
     lora_dropout: float = 0.05
-    lora_target_modules: list[str] = field(default_factory=lambda: ["q_proj", "k_proj", "v_proj", "o_proj", "up_proj", "down_proj", "gate_proj"])
+    target_modules: list[str] = field(default_factory=lambda: ["q_proj", "k_proj", "v_proj", "o_proj", "up_proj", "down_proj", "gate_proj"])  # Changed from lora_target_modules
 
     #Hugging Face Hub arguments
     hf_token: str | None = None
@@ -57,10 +57,10 @@ class GRPORunner:
         if script_args and script_args.use_lora:
             logger.info("=" * 50)
             logger.info("APPLYING LORA FINE-TUNING")
-            logger.info(f"LoRA rank: {script_args.lora_r}")
+            logger.info(f"LoRA rank: {script_args.lora_rank}")
             logger.info(f"LoRA alpha: {script_args.lora_alpha}")
             logger.info(f"LoRA dropout: {script_args.lora_dropout}")
-            logger.info(f"LoRA target modules: {script_args.lora_target_modules}")
+            logger.info(f"LoRA target modules: {script_args.target_modules}")
             logger.info("=" * 50)
             
             # Count total parameters before LoRA
@@ -68,10 +68,10 @@ class GRPORunner:
             logger.info(f"Total parameters before LoRA: {total_params:,}")
             
             lora_config = LoraConfig(
-                r=script_args.lora_r,
+                r=script_args.lora_rank,
                 lora_alpha=script_args.lora_alpha,
                 lora_dropout=script_args.lora_dropout,
-                target_modules=script_args.lora_target_modules,
+                target_modules=script_args.target_modules,
                 bias="none",
                 task_type="CAUSAL_LM"
             )
