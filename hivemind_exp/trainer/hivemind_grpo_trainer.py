@@ -47,6 +47,19 @@ class HivemindGRPOTrainer:
             self.dht = dht
             self.logger = logger
             self.stage_rewards = 0.0
+            
+            # Log if we're using a PEFT/LoRA model
+            model = kwargs.get("model")
+            if model and hasattr(model, "is_peft_model") and model.is_peft_model:
+                self.logger.info("=" * 50)
+                self.logger.info("INITIALIZING TRAINER WITH LORA MODEL")
+                self.logger.info(f"Model type: {type(model).__name__}")
+                if hasattr(model, "active_adapter"):
+                    self.logger.info(f"Active adapter: {model.active_adapter}")
+                if hasattr(model, "modules_to_save"):
+                    self.logger.info(f"Modules to save: {model.modules_to_save}")
+                self.logger.info("=" * 50)
+            
             super().__init__(processing_class=tokenizer, **kwargs)
 
         def publish_leaderboard(self):
@@ -69,7 +82,70 @@ class HivemindGRPOTrainer:
             else:
                 self.logger.info(f"Can't retrieve round {r} stage {s - 1} rewards")
 
+        # Store initial LoRA weights for comparison
+        initial_lora_weights = {}
+        
         def compute_loss(self, model, inputs, *args, **kwargs):
+            # First time initialization of weight tracking
+            if hasattr(model, "is_peft_model") and model.is_peft_model and not hasattr(self, '_lora_weight_tracking_initialized'):
+                self._lora_weight_tracking_initialized = True
+                
+                # Store initial LoRA weights for tracking changes
+                for name, param in model.named_parameters():
+                    if 'lora' in name.lower() and param.requires_grad:
+                        # Store a clone of the initial weights for comparison
+                        if hasattr(param, 'data'):
+                            self.initial_lora_weights[name] = param.data.clone().detach()
+                
+                self.logger.info(f"Initialized LoRA weight tracking for {len(self.initial_lora_weights)} parameters")
+            
+            # Log LoRA usage periodically during training
+            if hasattr(model, "is_peft_model") and model.is_peft_model and self.state.global_step % 50 == 0:
+                self.logger.info(f"Step {self.state.global_step}: Using LoRA model for training")
+                
+                # Check if any gradients are flowing through LoRA layers
+                if self.state.global_step % 200 == 0:  # Less frequent check to avoid log spam
+                    has_grad = False
+                    for name, param in model.named_parameters():
+                        if 'lora' in name.lower() and param.requires_grad:
+                            if param.grad is not None and torch.sum(torch.abs(param.grad)) > 0:
+                                has_grad = True
+                                self.logger.info(f"LoRA parameter {name} has non-zero gradients")
+                                break
+                    if not has_grad:
+                        self.logger.warning("No gradients detected in LoRA parameters! Check your configuration.")
+                
+                # Log weight changes for LoRA parameters occasionally
+                if self.state.global_step % 300 == 0 and hasattr(self, '_lora_weight_tracking_initialized'):
+                    self.logger.info("=" * 30)
+                    self.logger.info(f"LORA WEIGHT CHANGES AT STEP {self.state.global_step}")
+                    checked = 0
+                    
+                    for name, param in model.named_parameters():
+                        if name in self.initial_lora_weights and checked < 3:
+                            # Calculate change from initial weights
+                            initial = self.initial_lora_weights[name]
+                            current = param.data
+                            
+                            if initial.shape == current.shape:
+                                # Calculate statistics about the changes
+                                abs_diff = torch.abs(current - initial)
+                                mean_change = abs_diff.mean().item()
+                                max_change = abs_diff.max().item()
+                                
+                                # Calculate percentage of weights that changed significantly
+                                significant_change_threshold = 1e-6
+                                pct_changed = (abs_diff > significant_change_threshold).float().mean().item() * 100
+                                
+                                self.logger.info(f"Parameter: {name}")
+                                self.logger.info(f"  - Mean absolute change: {mean_change:.8f}")
+                                self.logger.info(f"  - Max absolute change: {max_change:.8f}")
+                                self.logger.info(f"  - Percentage weights changed: {pct_changed:.2f}%")
+                                
+                                checked += 1
+                    
+                    self.logger.info("=" * 30)
+            
             loss = super().compute_loss(model, inputs, *args, **kwargs)
             # Reward function must save node.outputs + node.rewards!
             # This is only here to publish to the DHT at the right time.
@@ -160,6 +236,33 @@ class HivemindGRPOTrainer:
                 )
 
             self.logger.info(f"📈 Training round: {round_num} stage: {stage_num}")
+            
+            # Log LoRA status at the beginning of each stage
+            if hasattr(self.model, "is_peft_model") and self.model.is_peft_model:
+                self.logger.info("=" * 50)
+                self.logger.info(f"LORA STATUS AT START OF ROUND {round_num} STAGE {stage_num}")
+                
+                # Log adapter information
+                if hasattr(self.model, "active_adapter"):
+                    self.logger.info(f"Active adapter: {self.model.active_adapter}")
+                
+                # Count trainable parameters
+                trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+                total_params = sum(p.numel() for p in self.model.parameters())
+                self.logger.info(f"Trainable parameters: {trainable_params:,} / {total_params:,} ({trainable_params/total_params*100:.2f}%)")
+                
+                # Sample some initial LoRA weights
+                self.logger.info("Initial LoRA weight samples:")
+                checked = 0
+                for name, param in self.model.named_parameters():
+                    if 'lora' in name.lower() and param.requires_grad:
+                        if checked < 5:  # Limit to avoid log spam
+                            mean = param.data.mean().item()
+                            std = param.data.std().item()
+                            self.logger.info(f"  - {name}: mean={mean:.6f}, std={std:.6f}")
+                            checked += 1
+                self.logger.info("=" * 50)
+            
             train_dataset, test_dataset = stage.datasets_fn(round_num, stage_num)
             kwargs = {
                 "model": self.model,
@@ -172,6 +275,40 @@ class HivemindGRPOTrainer:
                 self.node, self.dht, self.tokenizer, self.logger, **kwargs
             )
             self.train_and_save(trainer, train_dataset)
+            
+            # Print LoRA summary after training
+            if hasattr(self.model, "is_peft_model") and self.model.is_peft_model:
+                self.logger.info("=" * 50)
+                self.logger.info(f"LORA TRAINING SUMMARY FOR ROUND {round_num} STAGE {stage_num}")
+                
+                # Count and report parameter changes
+                total_lora_params = 0
+                total_changed_params = 0
+                significant_threshold = 1e-5
+                
+                for name, param in self.model.named_parameters():
+                    if 'lora' in name.lower() and param.requires_grad:
+                        param_count = param.numel()
+                        total_lora_params += param_count
+                        
+                        # If we have initial weights for comparison
+                        if hasattr(trainer, 'initial_lora_weights') and name in trainer.initial_lora_weights:
+                            initial = trainer.initial_lora_weights[name]
+                            current = param.data
+                            
+                            if initial.shape == current.shape:
+                                # Count significantly changed weights
+                                changed = (torch.abs(current - initial) > significant_threshold).sum().item()
+                                total_changed_params += changed
+                
+                # Report overall statistics
+                if total_lora_params > 0:
+                    change_percentage = (total_changed_params / total_lora_params) * 100
+                    self.logger.info(f"Total LoRA parameters: {total_lora_params:,}")
+                    self.logger.info(f"Parameters changed significantly: {total_changed_params:,} ({change_percentage:.2f}%)")
+                
+                self.logger.info("=" * 50)
+            
             self.logger.info(
                 f"📉 Finished training round: {round_num} stage: {stage_num}"
             )
@@ -214,6 +351,36 @@ class HivemindGRPOTrainer:
         self.node.clear_stage_cache()
 
     def train_and_save(self, trainer, train_dataset):
+        # Print detailed model info before training
+        if hasattr(trainer.model, "is_peft_model") and trainer.model.is_peft_model:
+            self.logger.info("=" * 50)
+            self.logger.info("LORA MODEL STRUCTURE BEFORE TRAINING")
+            # Print model structure focusing on LoRA modules
+            for name, module in trainer.model.named_modules():
+                if 'lora' in name.lower():
+                    self.logger.info(f"Found LoRA module: {name} - {type(module).__name__}")
+                    if hasattr(module, 'weight'):
+                        self.logger.info(f"  - Shape: {module.weight.shape if hasattr(module.weight, 'shape') else 'N/A'}")
+                    if hasattr(module, 'r'):
+                        self.logger.info(f"  - Rank: {module.r}")
+                    if hasattr(module, 'lora_alpha'):
+                        self.logger.info(f"  - Alpha: {module.lora_alpha}")
+            
+            # Verify LoRA weights exist and require gradients
+            lora_layers = 0
+            trainable_params = 0
+            for name, param in trainer.model.named_parameters():
+                if 'lora' in name.lower():
+                    lora_layers += 1
+                    if param.requires_grad:
+                        trainable_params += param.numel()
+                        self.logger.info(f"  - Trainable LoRA param: {name}, shape: {param.shape}")
+            
+            self.logger.info(f"Total LoRA layers found: {lora_layers}")
+            self.logger.info(f"Total trainable parameters: {trainable_params:,}")
+            self.logger.info("=" * 50)
+            
+        # Regular training loop
         for num_fails in range(MAX_TRAIN_FAILS):
             try:
                 train_result = trainer.train()
@@ -233,7 +400,47 @@ class HivemindGRPOTrainer:
 
         self.logger.info("Saving model")
         trainer.model.config.use_cache = True
-        trainer.save_model(self.config.output_dir)
+        
+        # Check if the model is using PEFT/LoRA
+        if hasattr(trainer.model, "is_peft_model") and trainer.model.is_peft_model:
+            self.logger.info("=" * 50)
+            self.logger.info("SAVING PEFT/LORA MODEL ADAPTER WEIGHTS")
+            self.logger.info(f"Model checkpoint directory: {self.config.output_dir}")
+            
+            # Log active adapters
+            if hasattr(trainer.model, "active_adapter"):
+                self.logger.info(f"Active adapter: {trainer.model.active_adapter}")
+            if hasattr(trainer.model, "peft_config"):
+                self.logger.info("PEFT configuration:")
+                for adapter_name, config in trainer.model.peft_config.items():
+                    self.logger.info(f"Adapter: {adapter_name}")
+                    for k, v in config.to_dict().items():
+                        self.logger.info(f"  - {k}: {v}")
+            
+            # Sample and log some LoRA weights to verify they've changed
+            self.logger.info("Sample of trained LoRA weights:")
+            checked_weights = 0
+            for name, param in trainer.model.named_parameters():
+                if 'lora' in name.lower() and param.requires_grad:
+                    if checked_weights < 5:  # Limit to 5 weights to avoid log spam
+                        # Get some statistics about the weights
+                        if param.numel() > 0:
+                            mean = param.data.mean().item()
+                            std = param.data.std().item()
+                            min_val = param.data.min().item()
+                            max_val = param.data.max().item()
+                            self.logger.info(f"  - {name}: mean={mean:.6f}, std={std:.6f}, min={min_val:.6f}, max={max_val:.6f}")
+                            checked_weights += 1
+            
+            # Save the adapter weights
+            trainer.model.save_pretrained(self.config.output_dir)
+            self.logger.info("LoRA adapter weights saved successfully")
+            self.logger.info("=" * 50)
+        else:
+            # Save full model weights for non-LoRA models
+            self.logger.info("Saving full model weights (LoRA not detected)")
+            trainer.save_model(self.config.output_dir)
+            
         self.logger.info(f"Model saved to {self.config.output_dir}")
         assert self.config.distributed_state
         self.config.distributed_state.wait_for_everyone()  # wait for all processes to load

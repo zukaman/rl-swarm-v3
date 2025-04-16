@@ -8,6 +8,7 @@ from datasets import Dataset
 from huggingface_hub import login
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import GRPOConfig, ModelConfig
+from peft import LoraConfig, get_peft_model
 
 from hivemind_exp.gsm8k.stage_utils import gsm8k_stage_data
 from hivemind_exp.hivemind_utils import HivemindNode
@@ -32,18 +33,69 @@ class GRPOArguments:
     number_of_data_samples: int = 50000
     public_maddr: str | None = None
 
+    # LoRA arguments
+    use_lora: bool = False
+    lora_r: int = 16
+    lora_alpha: int = 32
+    lora_dropout: float = 0.05
+    lora_target_modules: list[str] = field(default_factory=lambda: ["q_proj", "k_proj", "v_proj", "o_proj", "up_proj", "down_proj", "gate_proj"])
+
     #Hugging Face Hub arguments
     hf_token: str | None = None
 
 
 class GRPORunner:
-    def get_model(self, args: GRPOConfig, model_name: str):
+    def get_model(self, args: GRPOConfig, model_name: str, script_args: GRPOArguments = None):
         model_init_kwargs = args.model_init_kwargs or {}
         # Disable caching if gradient checkpointing is enabled (not supported)
         model_init_kwargs["use_cache"] = (
             False if args.gradient_checkpointing else model_init_kwargs.get("use_cache")
         )
-        return AutoModelForCausalLM.from_pretrained(model_name, **model_init_kwargs)
+        model = AutoModelForCausalLM.from_pretrained(model_name, **model_init_kwargs)
+        
+        # Apply LoRA if enabled in script_args
+        if script_args and script_args.use_lora:
+            logger.info("=" * 50)
+            logger.info("APPLYING LORA FINE-TUNING")
+            logger.info(f"LoRA rank: {script_args.lora_r}")
+            logger.info(f"LoRA alpha: {script_args.lora_alpha}")
+            logger.info(f"LoRA dropout: {script_args.lora_dropout}")
+            logger.info(f"LoRA target modules: {script_args.lora_target_modules}")
+            logger.info("=" * 50)
+            
+            # Count total parameters before LoRA
+            total_params = sum(p.numel() for p in model.parameters())
+            logger.info(f"Total parameters before LoRA: {total_params:,}")
+            
+            lora_config = LoraConfig(
+                r=script_args.lora_r,
+                lora_alpha=script_args.lora_alpha,
+                lora_dropout=script_args.lora_dropout,
+                target_modules=script_args.lora_target_modules,
+                bias="none",
+                task_type="CAUSAL_LM"
+            )
+            
+            # Apply LoRA
+            model = get_peft_model(model, lora_config)
+            
+            # Log detailed LoRA info
+            trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+            logger.info(f"Total trainable parameters with LoRA: {trainable_params:,}")
+            logger.info(f"Parameter efficiency: {trainable_params/total_params*100:.2f}%")
+            
+            # Print detailed trainable parameters information
+            model.print_trainable_parameters()
+            
+            # Log LoRA adapter names for verification
+            logger.info("LoRA adapter names:")
+            for name, _ in model.named_modules():
+                if 'lora' in name.lower():
+                    logger.info(f"  - {name}")
+            
+            logger.info("=" * 50)
+        
+        return model
 
     def get_tokenizer_name(self, model_args: ModelConfig, script_args: GRPOArguments):
         if script_args.tokenizer_name_or_path:
@@ -139,7 +191,7 @@ class GRPORunner:
         #########################
         model_name_or_path = model_args.model_name_or_path
         assert model_name_or_path
-        model = self.get_model(training_args, model_name_or_path)
+        model = self.get_model(training_args, model_name_or_path, grpo_args)
 
         initial_peers = grpo_args.initial_peers
         if initial_peers:
