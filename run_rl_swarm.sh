@@ -168,13 +168,13 @@ fi
 echo_green ">> Good luck in the swarm!"
 
 if [ -n "$ORG_ID" ]; then
-    python -m hivemind_exp.gsm8k.train_single_gpu \
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True python -m hivemind_exp.gsm8k.train_single_gpu \
         --hf_token "$HUGGINGFACE_ACCESS_TOKEN" \
         --identity_path "$IDENTITY_PATH" \
         --modal_org_id "$ORG_ID" \
         --config "$CONFIG_PATH"
 else
-    python -m hivemind_exp.gsm8k.train_single_gpu \
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True python -m hivemind_exp.gsm8k.train_single_gpu \
         --hf_token "$HUGGINGFACE_ACCESS_TOKEN" \
         --identity_path "$IDENTITY_PATH" \
         --public_maddr "$PUB_MULTI_ADDRS" \
