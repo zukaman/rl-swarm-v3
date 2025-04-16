@@ -98,7 +98,11 @@ if [ "$CONNECT_TO_TESTNET" = "True" ]; then
     SERVER_PID=$!  # Store the process ID
     echo "Started server process: $SERVER_PID"
     sleep 5
-    open http://localhost:3000
+    
+    # Replace the browser opening command with a message about accessing via tunnel
+    echo_green ">> Please access the login page at http://localhost:3000 through your cloudflared tunnel"
+    # open http://localhost:3000  <- removing this line
+    
     cd ..
 
     echo_green ">> Waiting for modal userData.json to be created..."
