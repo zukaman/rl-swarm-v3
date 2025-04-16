@@ -9,13 +9,22 @@ from hivemind_exp.hivemind_utils import HivemindNode
 
 
 def extract_xml_identity(text: str) -> str:
-    id = text.split("<identify>")[-1]
-    id = id.split("</identify>")[0]
-    return id.strip()
+    if text is None:
+        return ""
+    
+    try:
+        id = text.split("<identify>")[-1]
+        id = id.split("</identify>")[0]
+        return id.strip()
+    except Exception:
+        return ""
 
 
 def extract_xml_ids(text: str) -> str:
     ids = []
+    if text is None:
+        return ids
+    
     ids_raw = text.split("<student>")[1:]
     for id in ids_raw:
         ids += [id.split("</student>")[0].strip()]
@@ -23,38 +32,56 @@ def extract_xml_ids(text: str) -> str:
 
 
 def extract_original_question(text: str) -> str:
-    q = text.split("  \n\nThe following answers to this question were suggested:")[0]
-    q = q.split("The question we were given is: ")[-1]
-    return q
+    if text is None:
+        return ""
+    
+    try:
+        q = text.split("  \n\nThe following answers to this question were suggested:")[0]
+        q = q.split("The question we were given is: ")[-1]
+        return q
+    except Exception:
+        return text  # Return original text if parsing fails
 
 
 def extract_answers(text: str) -> str:
     answers = {}
-    raw = text.split("<student>")[1:]
-    for a in raw:
-        id = a.split("</student>")[0].strip()
-        ans = a.split("</student> said \n")[-1].strip()
-        answers[id] = ans
-    return answers
+    if text is None:
+        return answers
+    
+    try:
+        raw = text.split("<student>")[1:]
+        for a in raw:
+            id = a.split("</student>")[0].strip()
+            ans = a.split("</student> said \n")[-1].strip()
+            answers[id] = ans
+        return answers
+    except Exception:
+        return answers
 
 
 def count_xml(text) -> float:
     count = 0.0
-    if text.count("<compare>\n") == 1:
-        count += 0.125
-    if text.count("\n</compare>\n") == 1:
-        count += 0.125
-    if text.count("<explain>\n") == 1:
-        count += 0.125
-    if text.count("\n</explain>\n") == 1:
-        count += 0.125
-    if text.count("\n<identify>\n") == 1:
-        count += 0.125
-        count -= len(text.split("\n</identify>\n")[-1]) * 0.001
-    if text.count("\n</identify>") == 1:
-        count += 0.125
-        count -= (len(text.split("\n</identify>")[-1]) - 1) * 0.001
-    return count
+    if text is None:
+        return count
+    
+    try:
+        if text.count("<compare>\n") == 1:
+            count += 0.125
+        if text.count("\n</compare>\n") == 1:
+            count += 0.125
+        if text.count("<explain>\n") == 1:
+            count += 0.125
+        if text.count("\n</explain>\n") == 1:
+            count += 0.125
+        if text.count("\n<identify>\n") == 1:
+            count += 0.125
+            count -= len(text.split("\n</identify>\n")[-1]) * 0.001
+        if text.count("\n</identify>") == 1:
+            count += 0.125
+            count -= (len(text.split("\n</identify>")[-1]) - 1) * 0.001
+        return count
+    except Exception:
+        return count
 
 
 # Reward functions
