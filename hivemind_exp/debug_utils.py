@@ -21,8 +21,11 @@ def print_system_info():
     print(f"  Physical cores: {psutil.cpu_count(logical=False)}")
     print(f"  Total cores: {psutil.cpu_count(logical=True)}")
     cpu_freq = psutil.cpu_freq()
-    print(f"  Max Frequency: {cpu_freq.max:.2f} Mhz")
-    print(f"  Current Frequency: {cpu_freq.current:.2f} Mhz")
+    if cpu_freq is not None:
+        print(f"  Max Frequency: {cpu_freq.max:.2f} Mhz")
+        print(f"  Current Frequency: {cpu_freq.current:.2f} Mhz")
+    else:
+        print("  CPU frequency information not available")
 
     print("\nMemory Information:")
     vm = psutil.virtual_memory()
